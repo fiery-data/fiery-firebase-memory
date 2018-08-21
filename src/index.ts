@@ -1,92 +1,30 @@
 
-
-export namespace firebase
+namespace firebase
 {
+
   export const SDK_VERSION: string = 'FFM-0.0.1'
 
   export const apps: firebase.app.App[] = []
 
+  const appsMap: { [name: string]: firebase.app.App } = Object.create(null)
+
+  const DEFAULT_APP_NAME: string = '[DEFAULT]'
+
   export function initializeApp(config: object, name?: string)
   {
-    const app = new firebase.app.App(config, name)
+    const desiredName = name || DEFAULT_APP_NAME
 
-    appsMap[app.name] = app
-    firebase.apps.push(app)
-
-    return app
-  }
-
-  export class Promise<T>
-  {
-    _kept: boolean = false
-    _resolve: OnResolve<T>[] = []
-    _reject: OnReject[] = []
-    _resolved: T
-    _error: Error
-
-    public constructor (resolver?: (resolve: OnResolve<T>, reject: OnReject) => any)
+    if (desiredName in appsMap)
     {
-      if (resolver)
-      {
-        resolver(this.resolve.bind(this), this.reject.bind(this))
-      }
+      return appsMap[desiredName]
     }
 
-    public resolve (resolved: T): this
-    {
-      if (!this._kept)
-      {
-        this._kept = true
-        this._resolved = resolved
-        this._resolve.forEach(resolve => resolve(resolved))
-        this._resolve.length = 0
-        this._reject.length = 0
-      }
+    const newApp = new firebase.app.App(config, desiredName)
 
-      return this
-    }
+    appsMap[desiredName] = newApp
+    apps.push(newApp)
 
-    public reject (error: Error): this
-    {
-      if (!this._kept)
-      {
-        this._kept = true
-        this._error = error
-        this._reject.forEach(reject => reject(error))
-        this._reject.length = 0
-        this._resolve.length = 0
-      }
-
-      return this
-    }
-
-    public then (resolve: OnResolve<T>): this
-    {
-      if (!this._kept)
-      {
-        this._resolve.push(resolve)
-      }
-      else if (!this._error)
-      {
-        resolve(this._resolved)
-      }
-
-      return this
-    }
-
-    public catch (reject: OnReject): this
-    {
-      if (!this._kept)
-      {
-        this._reject.push(reject)
-      }
-      else if (this._error)
-      {
-        reject(this._error)
-      }
-
-      return this
-    }
+    return newApp
   }
 
   export function app(name?: string): firebase.app.App
@@ -103,10 +41,10 @@ export namespace firebase
 
       readonly firebase_: any
 
-      public constructor (options: object, name?: string)
+      public constructor (options: object, name: string)
       {
         this.options = options
-        this.name = name || DEFAULT_APP_NAME
+        this.name = name
         this.firebase_ = firebase
       }
 
@@ -148,6 +86,15 @@ export namespace firebase
 
   export namespace firestore
   {
+
+    type Off = () => any
+
+    type ListenerMap = { [path: string]: Function[] }
+
+    type DocsMap = { [path: string]: any }
+
+    type CollectionsMap = { [path: string]: string[] }
+
     export class Firestore
     {
       public readonly app: firebase.app.App
@@ -313,6 +260,9 @@ export namespace firebase
       }
     }
 
+    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => any
+    type QuerySnapshotError = (error: any) => any
+
     export class Query
     {
       public readonly firestore: Firestore
@@ -334,37 +284,37 @@ export namespace firebase
 
       public endAt (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._endAt = q._endAt.concat(snapshotOrVarArgs))
+        return this.extend(q => q._endAt = q._endAt.concat(snapshotOrVarArgs))
       }
 
       public endBefore (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._endBefore = q._endBefore.concat(snapshotOrVarArgs))
+        return this.extend(q => q._endBefore = q._endBefore.concat(snapshotOrVarArgs))
       }
 
       public startAfter (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._startAfter = q._startAfter.concat(snapshotOrVarArgs))
+        return this.extend(q => q._startAfter = q._startAfter.concat(snapshotOrVarArgs))
       }
 
       public startAt (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._startAt = q._startAt.concat(snapshotOrVarArgs))
+        return this.extend(q => q._startAt = q._startAt.concat(snapshotOrVarArgs))
       }
 
       public limit (limit: number): Query
       {
-        return this.copy(q => q._limit = limit)
+        return this.extend(q => q._limit = limit)
       }
 
       public orderBy (fieldPath: string, directionStr: string = 'asc'): Query
       {
-        return this.copy(q => q._orderBy.push(new OrderBy(fieldPath, directionStr)))
+        return this.extend(q => q._orderBy.push(new OrderBy(fieldPath, directionStr)))
       }
 
       public where (fieldPath: string, operationStr: string, value: any): Query
       {
-        return this.copy(q => q._where.push(new Where(fieldPath, operationStr, value)))
+        return this.extend(q => q._where.push(new Where(fieldPath, operationStr, value)))
       }
 
       public get (options?: GetOptions): firebase.Promise<QuerySnapshot>
@@ -382,15 +332,15 @@ export namespace firebase
         onError?: QuerySnapshotError): Off
       {
         const options: QueryListenOptions | undefined = (
-          typeof optionsOrObserverOrOnNext !== 'function'
+          !isFunction(optionsOrObserverOrOnNext)
           ? optionsOrObserverOrOnNext
           : undefined)
         const observer: QuerySnapshotObserver = (
-          typeof optionsOrObserverOrOnNext === 'function'
+          isFunction(optionsOrObserverOrOnNext)
           ? optionsOrObserverOrOnNext
           : observerOrOnNextOrOnError) as QuerySnapshotObserver
         const errored: QuerySnapshotError | undefined = (
-          typeof optionsOrObserverOrOnNext === 'function'
+          isFunction(optionsOrObserverOrOnNext)
           ? observerOrOnNextOrOnError
           : onError)
 
@@ -422,23 +372,21 @@ export namespace firebase
         return off
       }
 
-      copyInstance (): Query
+      extend (modify?: (copy: Query) => any): Query
       {
-        return new Query(this.firestore, this._path)
-      }
+        const e = new Query(this.firestore, this._path)
 
-      copy (modify?: (copy: Query) => any): Query
-      {
-        const cpy = this.copyInstance()
-        cpy._orderBy = this._orderBy.slice()
-        cpy._startAfter = this._startAfter.slice()
-        cpy._startAt = this._startAt.slice()
-        cpy._endBefore = this._endBefore.slice()
-        cpy._endAt = this._endAt.slice()
-        cpy._where = this._where.slice()
-        cpy._limit = this._limit
-        if (modify) modify(cpy)
-        return cpy
+        e._where = this._where.slice()
+        e._orderBy = this._orderBy.slice()
+        e._startAfter = this._startAfter.slice()
+        e._startAt = this._startAt.slice()
+        e._endBefore = this._endBefore.slice()
+        e._endAt = this._endAt.slice()
+        e._limit = this._limit
+
+        if (modify) modify(e)
+
+        return e
       }
 
       getResults (): QueryDocumentSnapshot[]
@@ -456,14 +404,14 @@ export namespace firebase
         {
           const ref: DocumentReference = this.firestore.doc(parentPath + id)
           const doc: QueryDocumentSnapshot = ref.snapshot()
+          const where: Where[] = this._where
 
-          if (this._where.length === 0)
+          if (where.length === 0)
           {
             snapshots.push(doc)
           }
           else
           {
-            const where: Where[] = this._where
             let match: boolean = true
 
             for (var i = 0; match && i < where.length; i++)
@@ -580,7 +528,7 @@ export namespace firebase
       {
         return new FieldValue(existing =>
         {
-          if (!Array.isArray(existing))
+          if (!isArray(existing))
           {
             return existing
           }
@@ -605,7 +553,7 @@ export namespace firebase
       {
         return new FieldValue(existing =>
         {
-          if (!Array.isArray(existing))
+          if (!isArray(existing))
           {
             return existing
           }
@@ -661,20 +609,7 @@ export namespace firebase
 
       public get (fieldPath: string): any
       {
-        const parts: string[] = fieldPath.split(FIELD_SEPARATOR)
-        let value: any = this._data
-
-        for (let i = 0; i < parts.length; i++)
-        {
-          if (!value || !(parts[i] in value))
-          {
-            return undefined
-          }
-
-          value = value[parts[i]]
-        }
-
-        return value
+        return accessor(this._data, fieldPath).get()
       }
 
       public isEqual (other: DocumentSnapshot): boolean
@@ -726,7 +661,7 @@ export namespace firebase
           }
         }
 
-        for (var i = 0; i < this._prev.length; i++)
+        for (let i = 0; i < this._prev.length; i++)
         {
           const doc: QueryDocumentSnapshot = this._prev[i]
           const newIndex: number = this._next.findIndex(next => next.id === doc.id)
@@ -805,6 +740,9 @@ export namespace firebase
       }
     }
 
+    type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
+    type SnapshotError = (error: any) => any
+
     export class DocumentReference
     {
       public readonly firestore: Firestore
@@ -876,15 +814,15 @@ export namespace firebase
         onError?: SnapshotError): Off
       {
         const options: SnapshotListenOptions | undefined = (
-          typeof optionsOrObserverOrOnNext !== 'function'
+          !isFunction(optionsOrObserverOrOnNext)
           ? optionsOrObserverOrOnNext
           : undefined)
         const observer: SnapshotObserver = (
-          typeof optionsOrObserverOrOnNext === 'function'
+          isFunction(optionsOrObserverOrOnNext)
           ? optionsOrObserverOrOnNext
           : observerOrOnNextOrOnError) as SnapshotObserver
         const errored: SnapshotError | undefined = (
-          typeof optionsOrObserverOrOnNext === 'function'
+          isFunction(optionsOrObserverOrOnNext)
           ? observerOrOnNextOrOnError
           : onError)
 
@@ -905,21 +843,30 @@ export namespace firebase
         return off
       }
 
-      clearValues(): void
+      clearValues (): void
       {
         this.firestore.dataAtRemove(this.path)
       }
 
-      applyValues(values: any): void
+      applyValues (values: any): void
       {
         const data: any = this.firestore.dataAt(this.path, true)
 
         for (let prop in values)
         {
-          data[prop] = parseValue(data[prop], values[prop])
-        }
+          const access: Accessor = accessor(data, prop)
+          const prev: any = access.get()
+          const next: any = parseValue(prev, values[prop])
 
-        // TODO where prop has embedded values. ex: field.subfield
+          if (next === undefined)
+          {
+            access.delete()
+          }
+          else
+          {
+            access.set(next)
+          }
+        }
       }
 
       notify (): void
@@ -1038,6 +985,8 @@ export namespace firebase
       serverTimestamps?: 'estimate' | 'previous' | 'none'
     }
 
+    type ChangeType = 'added' | 'modified' | 'removed'
+
     export interface DocumentChange
     {
       doc: DocumentSnapshot
@@ -1050,6 +999,147 @@ export namespace firebase
     {
       includeMetadataChanges?: boolean
     }
+
+    class Where
+    {
+      readonly _fieldPath: string
+      readonly _opStr: string
+      readonly _value: any
+
+      public constructor (fieldPath: string, opStr: string, value: any)
+      {
+        this._fieldPath = fieldPath
+        this._opStr = opStr
+        this._value = value
+      }
+
+      public matches (doc: DocumentSnapshot): boolean
+      {
+        const val: any = doc.get(this._fieldPath)
+
+        if (val === undefined)
+        {
+          return false
+        }
+
+        switch (this._opStr)
+        {
+          case '==':
+            return compare(this._value, val) === 0
+          case '>=':
+            return compare(this._value, val) >= 0
+          case '>':
+            return compare(this._value, val) > 0
+          case '<=':
+            return compare(this._value, val) <= 0
+          case '<':
+            return compare(this._value, val) < 0
+          case 'array-contains':
+          case 'array_contains':
+            return isArray(val) && val.indexOf(this._value) !== -1
+        }
+
+        return false
+      }
+    }
+
+    class OrderBy
+    {
+      readonly _fieldPath: string
+      readonly _directionStr: string
+
+      public constructor (fieldPath: string, directionStr: string)
+      {
+        this._fieldPath = fieldPath
+        this._directionStr = directionStr
+      }
+
+      public compare (a: DocumentSnapshot, b: DocumentSnapshot): number
+      {
+        const aval: any = a.get(this._fieldPath)
+        const bval: any = b.get(this._fieldPath)
+        const comparison: number = compare(aval, bval)
+
+        return this._directionStr === 'asc' ? comparison : -comparison
+      }
+    }
+  }
+
+  type OnResolve<T> = (resolved: T) => any
+
+  type OnReject = (error: Error) => any
+
+  export class Promise<T>
+  {
+    _kept: boolean = false
+    _resolve: OnResolve<T>[] = []
+    _reject: OnReject[] = []
+    _resolved: T
+    _error: Error
+
+    public constructor (resolver?: (resolve: OnResolve<T>, reject: OnReject) => any)
+    {
+      if (resolver)
+      {
+        resolver(this.resolve.bind(this), this.reject.bind(this))
+      }
+    }
+
+    public resolve (resolved: T): this
+    {
+      if (!this._kept)
+      {
+        this._kept = true
+        this._resolved = resolved
+        this._resolve.forEach(resolve => resolve(resolved))
+        this._resolve.length = 0
+        this._reject.length = 0
+      }
+
+      return this
+    }
+
+    public reject (error: Error): this
+    {
+      if (!this._kept)
+      {
+        this._kept = true
+        this._error = error
+        this._reject.forEach(reject => reject(error))
+        this._reject.length = 0
+        this._resolve.length = 0
+      }
+
+      return this
+    }
+
+    public then (resolve: OnResolve<T>): this
+    {
+      if (!this._kept)
+      {
+        this._resolve.push(resolve)
+      }
+      else if (!this._error)
+      {
+        resolve(this._resolved)
+      }
+
+      return this
+    }
+
+    public catch (reject: OnReject): this
+    {
+      if (!this._kept)
+      {
+        this._reject.push(reject)
+      }
+      else if (this._error)
+      {
+        reject(this._error)
+      }
+
+      return this
+    }
   }
 }
 
@@ -1057,93 +1147,48 @@ export default firebase
 
 
 
-
-
-
-
-// Private
-type ListenerMap = { [path: string]: Function[] }
-type DocsMap = { [path: string]: any }
-type CollectionsMap = { [path: string]: string[] }
-type Hashmap<V> = { [key: string]: V }
-type OnResolve<T> = (resolved: T) => any
-type OnReject = (error: Error) => any
-type ChangeType = 'added' | 'modified' | 'removed'
-
-type QuerySnapshotObserver = (querySnapshot: firebase.firestore.QuerySnapshot) => any
-type QuerySnapshotError = (error: any) => any
-type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
-type SnapshotError = (error: any) => any
-type Off = () => any
 type ArrayItemTest<T> = (item: T, index: number) => boolean
 
-const appsMap: Hashmap<firebase.app.App> = Object.create(null)
-const DEFAULT_APP_NAME: string = '[DEFAULT]'
+type Accessor = { get(): any, set(value: any): any, delete(): any }
+
 const PATH_SEPARATOR: string = '/'
+
 const FIELD_SEPARATOR: string = '.'
 
-class OrderBy
+
+function isNumber (x: any): x is number
 {
-  readonly _fieldPath: string
-  readonly _directionStr: string
-
-  public constructor (fieldPath: string, directionStr: string)
-  {
-    this._fieldPath = fieldPath
-    this._directionStr = directionStr
-  }
-
-  public compare (a: firebase.firestore.DocumentSnapshot, b: firebase.firestore.DocumentSnapshot): number
-  {
-    const aval: any = a.get(this._fieldPath)
-    const bval: any = b.get(this._fieldPath)
-    const comparison: number = compare(aval, bval)
-
-    return this._directionStr === 'asc' ? comparison : -comparison
-  }
+  return typeof x === 'number'
 }
 
-class Where
+function isString (x: any): x is string
 {
-  readonly _fieldPath: string
-  readonly _opStr: string
-  readonly _value: any
+  return typeof x === 'string'
+}
 
-  public constructor (fieldPath: string, opStr: string, value: any)
-  {
-    this._fieldPath = fieldPath
-    this._opStr = opStr
-    this._value = value
-  }
+function isBoolean (x: any): x is boolean
+{
+  return typeof x == 'boolean'
+}
 
-  public matches (doc: firebase.firestore.DocumentSnapshot): boolean
-  {
-    const val: any = doc.get(this._fieldPath)
+function isFunction (x: any): x is Function
+{
+  return typeof x == 'function'
+}
 
-    if (val === undefined)
-    {
-      return false
-    }
+function isObject (x: any): x is any
+{
+  return typeof x === 'object'
+}
 
-    switch (this._opStr)
-    {
-      case '==':
-        return compare(this._value, val) === 0
-      case '>=':
-        return compare(this._value, val) >= 0
-      case '>':
-        return compare(this._value, val) > 0
-      case '<=':
-        return compare(this._value, val) <= 0
-      case '<':
-        return compare(this._value, val) < 0
-      case 'array-contains':
-      case 'array_contains':
-        return Array.isArray(val) && val.indexOf(this._value) !== -1
-    }
+function isArray<T> (x: any): x is Array<T>
+{
+  return x instanceof Array
+}
 
-    return false
-  }
+function isDate (x: any): x is Date
+{
+  return x instanceof Date
 }
 
 function sign (a: number): number
@@ -1157,22 +1202,22 @@ function compare (a: any, b: any): number
   if (a === undefined) return 1
   if (b === undefined) return -1
 
-  if (typeof a === 'number' && typeof b === 'number')
+  if (isNumber(a) && isNumber(b))
   {
     return sign(a - b)
   }
 
-  if (a instanceof Date && b instanceof Date)
+  if (isDate(a) && isDate(b))
   {
     return sign(a.getTime() - b.getTime())
   }
 
-  if (typeof a === 'string' && typeof b === 'string')
+  if (isString(a) && isString(b))
   {
     return a.localeCompare(b)
   }
 
-  if (typeof a === 'boolean' && typeof b === 'boolean')
+  if (isBoolean(a) && isBoolean(b))
   {
     return ((a ? 1 : 0) - (b ? 1 : 0))
   }
@@ -1200,12 +1245,12 @@ function equals (a: any, b: any)
     return false
   }
 
-  if (a instanceof Date && b instanceof Date)
+  if (isDate(a) && isDate(b))
   {
     return a.getTime() === b.getTime()
   }
 
-  if (Array.isArray(a) && Array.isArray(b))
+  if (isArray(a) && isArray(b))
   {
     if (a.length !== b.length)
     {
@@ -1247,13 +1292,90 @@ function equals (a: any, b: any)
   return false
 }
 
+function accessor (data: any, fieldPath: string): Accessor
+{
+  const parts: string[] = fieldPath.split(FIELD_SEPARATOR)
+  const last: string = parts[parts.length - 1]
+
+  return {
+    get (): any
+    {
+      let value: any = data
+
+      for (let i = 0; i < parts.length; i++)
+      {
+        const p: string = parts[i]
+
+        if (!value || !(p in value))
+        {
+          return undefined
+        }
+
+        value = value[p]
+      }
+
+      return value
+    },
+
+    set (value: any)
+    {
+      let curr: any = data
+
+      for (let i = 0; i < parts.length - 1; i++)
+      {
+        const p: string = parts[i]
+
+        if (!(p in curr))
+        {
+          curr[p] = {}
+        }
+
+        curr = curr[p]
+      }
+
+      curr[last] = value
+    },
+
+    delete (): any
+    {
+      let curr: any = data
+
+      for (let i = 0; i < parts.length - 1; i++)
+      {
+        const p: string = parts[i]
+
+        if (!curr || !(p in curr))
+        {
+          return undefined
+        }
+
+        curr = curr[p]
+      }
+
+      if (!curr)
+      {
+        return undefined
+      }
+
+      const deleting = curr[last]
+
+      delete curr[last]
+
+      return deleting
+    }
+  }
+}
+
 function newId (): string
 {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let autoId = '';
-  for (let i = 0; i < 20; i++) {
-      autoId += chars.charAt(Math.floor(Math.random() * chars.length));
+
+  for (let i = 0; i < 20; i++)
+  {
+    autoId += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+
   return autoId
 }
 
@@ -1277,15 +1399,15 @@ function copyData (data: any): any
 {
   let copy = data
 
-  if (data instanceof Date)
+  if (isDate(data))
   {
     copy = new Date(data.getTime())
   }
-  else if (Array.isArray(data))
+  else if (isArray(data))
   {
     copy = data.map(copyData)
   }
-  else if (typeof data === 'object')
+  else if (isObject(data))
   {
     copy = Object.create(null)
 
