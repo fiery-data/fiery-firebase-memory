@@ -2,7 +2,7 @@
     "name": "fiery-firebase-memory",
     "version": "0.0.1",
     "author": "Philip Diffenderfer",
-    "description": "An in memory TypeScript/JS clone of Firebase/Firestore",
+    "description": "An in memory TypeScript/JS clone of Firebase & Firestore",
     "license": "MIT",
     "main": "./dist/fiery-firebase-memory.js",
     "scripts": {
