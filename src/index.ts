@@ -332,24 +332,24 @@ export namespace firebase
         this._path = path
       }
 
-      public endAt (snapshotOrVarArgs: any): Query
+      public endAt (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._endAt.push(snapshotOrVarArgs))
+        return this.copy(q => q._endAt = q._endAt.concat(snapshotOrVarArgs))
       }
 
-      public endBefore (snapshotOrVarArgs: any): Query
+      public endBefore (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._endBefore.push(snapshotOrVarArgs))
+        return this.copy(q => q._endBefore = q._endBefore.concat(snapshotOrVarArgs))
       }
 
-      public startAfter (snapshotOrVarArgs: any): Query
+      public startAfter (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._startAfter.push(snapshotOrVarArgs))
+        return this.copy(q => q._startAfter = q._startAfter.concat(snapshotOrVarArgs))
       }
 
-      public startAt (snapshotOrVarArgs: any): Query
+      public startAt (...snapshotOrVarArgs: any[]): Query
       {
-        return this.copy(q => q._startAt.push(snapshotOrVarArgs))
+        return this.copy(q => q._startAt = q._startAt.concat(snapshotOrVarArgs))
       }
 
       public limit (limit: number): Query
@@ -481,10 +481,13 @@ export namespace firebase
           }
         }
 
-        if (this._orderBy.length)
-        {
-          const orderBy: OrderBy[] = this._orderBy
+        let start: number = 0
+        let end: number = Math.min(this._limit, snapshots.length)
 
+        const orderBy: OrderBy[] = this._orderBy
+
+        if (orderBy.length)
+        {
           snapshots.sort((a: QueryDocumentSnapshot, b: QueryDocumentSnapshot) =>
           {
             let compareTo: number = 0
@@ -501,13 +504,63 @@ export namespace firebase
 
             return compareTo
           })
+
+          const startAt: any[] = this._startAt
+          const startAfter: any[] = this._startAfter
+          const endAt: any[] = this._endAt
+          const endBefore: any[] = this._endBefore
+
+          for (let i = 0; i < orderBy.length; i++)
+          {
+            const orderFieldPath: string = orderBy[i]._fieldPath
+
+            if (i < startAt.length)
+            {
+              start = Math.max(start, findMarker(snapshots, orderFieldPath, startAt[i]))
+            }
+
+            if (i < startAfter.length)
+            {
+              start = Math.max(start, findMarker(snapshots, orderFieldPath, startAfter[i], findLastIndex) + 1)
+            }
+
+            if (i < endAt.length)
+            {
+              const endAtIndex: number = findMarker(snapshots, orderFieldPath, endAt[i])
+
+              if (endAtIndex >= 0)
+              {
+                end = Math.min(end, endAtIndex)
+              }
+            }
+
+            if (i < endBefore.length)
+            {
+              const endBeforeIndex: number = findMarker(snapshots, orderFieldPath, endBefore[i]) - 1
+
+              if (endBeforeIndex >= 0)
+              {
+                end = Math.min(end, endBeforeIndex)
+              }
+            }
+          }
         }
 
-        // TODO startAt, startAfter, endAt, endAFter
-
-        if (this._limit !== Number.MAX_VALUE && this._limit < snapshots.length)
+        if (start >= end)
         {
-          snapshots.splice(this._limit, snapshots.length - this._limit)
+          return []
+        }
+
+        if (start > 0)
+        {
+          snapshots.splice(0, start)
+        }
+
+        const limit: number = end - start
+
+        if (limit !== snapshots.length)
+        {
+          snapshots.splice(limit, snapshots.length - limit)
         }
 
         return snapshots
@@ -1002,6 +1055,12 @@ export namespace firebase
 
 export default firebase
 
+
+
+
+
+
+
 // Private
 type ListenerMap = { [path: string]: Function[] }
 type DocsMap = { [path: string]: any }
@@ -1016,6 +1075,7 @@ type QuerySnapshotError = (error: any) => any
 type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
 type SnapshotError = (error: any) => any
 type Off = () => any
+type ArrayItemTest<T> = (item: T, index: number) => boolean
 
 const appsMap: Hashmap<firebase.app.App> = Object.create(null)
 const DEFAULT_APP_NAME: string = '[DEFAULT]'
@@ -1213,7 +1273,7 @@ function parsePath (path: string): { parentPath: string, id: string }
   return { id, parentPath }
 }
 
-function copyData(data: any): any
+function copyData (data: any): any
 {
   let copy = data
 
@@ -1236,4 +1296,32 @@ function copyData(data: any): any
   }
 
   return copy
+}
+
+function findLastIndex<T>(array: T[], test: ArrayItemTest<T>): number
+{
+  for (let index = array.length - 1; index >= 0; index--)
+  {
+    if (test(array[index], index))
+    {
+      return index
+    }
+  }
+
+  return -1
+}
+
+function findMarker(snapshots: firebase.firestore.DocumentSnapshot[], fieldPath: string, marker: any,
+  alternativeFind?: (snapshots: firebase.firestore.DocumentSnapshot[], test: ArrayItemTest<firebase.firestore.DocumentSnapshot>) => number)
+{
+  if (marker instanceof firebase.firestore.DocumentSnapshot)
+  {
+    return snapshots.findIndex(snap => snap.ref.path === marker.ref.path)
+  }
+  else
+  {
+    const test = (snap: firebase.firestore.DocumentSnapshot) => equals(snap.get(fieldPath), marker)
+
+    return alternativeFind ? alternativeFind(snapshots, test) : snapshots.findIndex(test)
+  }
 }
