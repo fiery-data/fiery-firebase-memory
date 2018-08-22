@@ -1,5 +1,6 @@
-
-## Fiery Firebase Memory
+<p align="center">
+  <img src="https://avatars1.githubusercontent.com/u/42543587?s=200&v=4" alt="Fiery Firebase Memory">  
+</p>
 
 This is a clone of Firebase Realtime Database & Firestore in TypeScript/JS which stores the data in memory.
 
