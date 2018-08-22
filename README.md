@@ -3,6 +3,8 @@
 
 This is a clone of Firebase Realtime Database & Firestore in TypeScript/JS which stores the data in memory.
 
+**!!! At the moment, only the Firestore code is "fully" developed !!!**
+
 ### Installation
 
 `npm install fiery-firebase-memory`
@@ -13,7 +15,7 @@ Example with default app (just like normal firebase)
 import firebase from 'fiery-firebase-memory'
 
 firebase.initializeApp({
-  // config for default app
+  // config for default app - doesn't mean anything for this library
 });
 
 var fs = firebase.firestore();
