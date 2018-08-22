@@ -1,12 +1,12 @@
 
-namespace firebase
+export namespace firebase
 {
 
   export const SDK_VERSION: string = 'FFM-0.0.1'
 
   export const apps: firebase.app.App[] = []
 
-  const appsMap: { [name: string]: firebase.app.App } = Object.create(null)
+  const appsMap: { [name: string]: firebase.app.App } = obj()
 
   const DEFAULT_APP_NAME: string = '[DEFAULT]'
 
@@ -39,7 +39,9 @@ namespace firebase
       public readonly name: string
       public readonly options: object
 
-      readonly firebase_: any
+      firebase_: any
+      // database_: firebase.database.Database
+      firestore_: firebase.firestore.Firestore
 
       public constructor (options: object, name: string)
       {
@@ -53,11 +55,26 @@ namespace firebase
         throw 'firebase.app.App.auth is not supported'
       }
 
-      public database ()
+      public database () //: firebase.database.Database
       {
-        // TODO
+        /*
+        if (!this.database_)
+        {
+          this.database_ = new firebase.database.Database(this)
+        }
 
-        throw 'firebase.app.App.database is not supported'
+        return this.database_
+        */
+      }
+
+      public firestore (): firebase.firestore.Firestore
+      {
+        if (!this.firestore_)
+        {
+          this.firestore_ = new firebase.firestore.Firestore(this)
+        }
+
+        return this.firestore_
       }
 
       public delete ()
@@ -77,11 +94,14 @@ namespace firebase
     }
   }
 
-  export function firestore(name?: string)
+  export function firestore(nameOrApp?: string | firebase.app.App): firebase.firestore.Firestore
   {
-    const app: firebase.app.App = firebase.app(name)
+    const app: firebase.app.App =
+      nameOrApp instanceof firebase.app.App
+      ? nameOrApp as firebase.app.App
+      : firebase.app(nameOrApp)
 
-    return new firebase.firestore.Firestore(app)
+    return app.firestore()
   }
 
   export namespace firestore
@@ -95,6 +115,19 @@ namespace firebase
 
     type CollectionsMap = { [path: string]: string[] }
 
+    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => any
+
+    type QuerySnapshotError = (error: any) => any
+
+    export type QueryDocumentSnapshot = DocumentSnapshot
+
+    type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
+
+    type SnapshotError = (error: any) => any
+
+    type ChangeType = 'added' | 'modified' | 'removed'
+
+
     export class Firestore
     {
       public readonly app: firebase.app.App
@@ -107,9 +140,9 @@ namespace firebase
       public constructor (app: firebase.app.App)
       {
         this.app = app
-        this._docs = Object.create(null)
-        this._collections = Object.create(null)
-        this._listeners = Object.create(null)
+        this._docs = obj()
+        this._collections = obj()
+        this._listeners = obj()
       }
 
       public batch (): WriteBatch
@@ -171,7 +204,7 @@ namespace firebase
       {
         if (!(path in this._docs) && create)
         {
-          this._docs[path] = Object.create(null)
+          this._docs[path] = obj()
 
           const { id, parentPath } = parsePath(path)
           let collection: string[] = this._collections[parentPath]
@@ -259,9 +292,6 @@ namespace firebase
         this.listenersAt(path).forEach(listener => listener())
       }
     }
-
-    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => any
-    type QuerySnapshotError = (error: any) => any
 
     export class Query
     {
@@ -609,7 +639,7 @@ namespace firebase
 
       public get (fieldPath: string): any
       {
-        return accessor(this._data, fieldPath).get()
+        return accessor(this._data, fieldPath, FIELD_SEPERATOR).get()
       }
 
       public isEqual (other: DocumentSnapshot): boolean
@@ -617,8 +647,6 @@ namespace firebase
         return this.ref.path === other.ref.path && equals(this._data, other._data)
       }
     }
-
-    export type QueryDocumentSnapshot = DocumentSnapshot
 
     export class QuerySnapshot
     {
@@ -740,9 +768,6 @@ namespace firebase
       }
     }
 
-    type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
-    type SnapshotError = (error: any) => any
-
     export class DocumentReference
     {
       public readonly firestore: Firestore
@@ -854,7 +879,7 @@ namespace firebase
 
         for (let prop in values)
         {
-          const access: Accessor = accessor(data, prop)
+          const access: Accessor = accessor(data, prop, FIELD_SEPERATOR)
           const prev: any = access.get()
           const next: any = parseValue(prev, values[prop])
 
@@ -985,8 +1010,6 @@ namespace firebase
       serverTimestamps?: 'estimate' | 'previous' | 'none'
     }
 
-    type ChangeType = 'added' | 'modified' | 'removed'
-
     export interface DocumentChange
     {
       doc: DocumentSnapshot
@@ -1063,11 +1086,30 @@ namespace firebase
         return this._directionStr === 'asc' ? comparison : -comparison
       }
     }
+
+    function parseValue (existing: any, value: any): any
+    {
+      return value instanceof firebase.firestore.FieldValue
+        ? value.compute(existing)
+        : value
+    }
+
+    function findMarker(snapshots: DocumentSnapshot[], fieldPath: string, marker: any,
+      alternativeFind?: (snapshots: DocumentSnapshot[], test: ArrayTest<DocumentSnapshot>) => number)
+    {
+      if (marker instanceof firebase.firestore.DocumentSnapshot)
+      {
+        return snapshots.findIndex(snap => snap.ref.path === marker.ref.path)
+      }
+      else
+      {
+        const test = (snap: DocumentSnapshot) => equals(snap.get(fieldPath), marker)
+
+        return alternativeFind ? alternativeFind(snapshots, test) : snapshots.findIndex(test)
+      }
+    }
   }
 
-  type OnResolve<T> = (resolved: T) => any
-
-  type OnReject = (error: Error) => any
 
   export class Promise<T>
   {
@@ -1115,6 +1157,11 @@ namespace firebase
 
     public then (resolve: OnResolve<T>): this
     {
+      if (!isFunction(resolve))
+      {
+        return this;
+      }
+
       if (!this._kept)
       {
         this._resolve.push(resolve)
@@ -1129,6 +1176,11 @@ namespace firebase
 
     public catch (reject: OnReject): this
     {
+      if (!isFunction(reject))
+      {
+        return this;
+      }
+
       if (!this._kept)
       {
         this._reject.push(reject)
@@ -1141,309 +1193,317 @@ namespace firebase
       return this
     }
   }
-}
 
-export default firebase
+  const PATH_SEPARATOR: string = '/'
 
+  const FIELD_SEPERATOR: string = '.'
 
-
-type ArrayItemTest<T> = (item: T, index: number) => boolean
-
-type Accessor = { get(): any, set(value: any): any, delete(): any }
-
-const PATH_SEPARATOR: string = '/'
-
-const FIELD_SEPARATOR: string = '.'
-
-
-function isNumber (x: any): x is number
-{
-  return typeof x === 'number'
-}
-
-function isString (x: any): x is string
-{
-  return typeof x === 'string'
-}
-
-function isBoolean (x: any): x is boolean
-{
-  return typeof x == 'boolean'
-}
-
-function isFunction (x: any): x is Function
-{
-  return typeof x == 'function'
-}
-
-function isObject (x: any): x is any
-{
-  return typeof x === 'object'
-}
-
-function isArray<T> (x: any): x is Array<T>
-{
-  return x instanceof Array
-}
-
-function isDate (x: any): x is Date
-{
-  return x instanceof Date
-}
-
-function sign (a: number): number
-{
-  return a < 0 ? -1 : (a > 0 ? 1 : 0)
-}
-
-function compare (a: any, b: any): number
-{
-  if (a === b) return 0
-  if (a === undefined) return 1
-  if (b === undefined) return -1
-
-  if (isNumber(a) && isNumber(b))
+  interface Accessor
   {
-    return sign(a - b)
+    get (create?: boolean): any
+
+    set (value: any): any
+
+    delete (): any
   }
 
-  if (isDate(a) && isDate(b))
+  type OnResolve<T> = (resolved: T) => any
+
+  type OnReject = (error: Error) => any
+
+  type ArrayTest<T> = (item: T, index: number) => boolean
+
+  function isNumber (x: any): x is number
   {
-    return sign(a.getTime() - b.getTime())
+    return typeof x === 'number'
   }
 
-  if (isString(a) && isString(b))
+  function isString (x: any): x is string
   {
-    return a.localeCompare(b)
+    return typeof x === 'string'
   }
 
-  if (isBoolean(a) && isBoolean(b))
+  function isBoolean (x: any): x is boolean
   {
-    return ((a ? 1 : 0) - (b ? 1 : 0))
+    return typeof x == 'boolean'
   }
 
-  return 0
-}
-
-function equals (a: any, b: any)
-{
-  if (compare(a, b) !== 0)
+  function isFunction (x: any): x is Function
   {
-    return false
+    return typeof x == 'function'
   }
 
-  if (a === b)
+  function isObject (x: any): x is any
   {
-    return true
+    return typeof x === 'object'
   }
 
-  const ta: string = typeof a
-  const tb: string = typeof b
-
-  if (ta !== tb)
+  function isDefined (x?: any): boolean
   {
-    return false
+    return typeof x !== 'undefined'
   }
 
-  if (isDate(a) && isDate(b))
+  function isValue (x?: any): boolean
   {
-    return a.getTime() === b.getTime()
+    return x !== null && typeof x !== 'undefined'
   }
 
-  if (isArray(a) && isArray(b))
+  function isArray<T> (x: any): x is Array<T>
   {
-    if (a.length !== b.length)
+    return x instanceof Array
+  }
+
+  function isDate (x: any): x is Date
+  {
+    return x instanceof Date
+  }
+
+  function obj (): any
+  {
+    return Object.create(null)
+  }
+
+  function sign (a: number): number
+  {
+    return a < 0 ? -1 : (a > 0 ? 1 : 0)
+  }
+
+  function compare (a: any, b: any): number
+  {
+    if (a === b) return 0
+    if (a === undefined) return 1
+    if (b === undefined) return -1
+
+    if (isNumber(a) && isNumber(b))
+    {
+      return sign(a - b)
+    }
+
+    if (isDate(a) && isDate(b))
+    {
+      return sign(a.getTime() - b.getTime())
+    }
+
+    if (isString(a) && isString(b))
+    {
+      return a.localeCompare(b)
+    }
+
+    if (isBoolean(a) && isBoolean(b))
+    {
+      return ((a ? 1 : 0) - (b ? 1 : 0))
+    }
+
+    return 0
+  }
+
+  function equals (a: any, b: any)
+  {
+    if (compare(a, b) !== 0)
     {
       return false
     }
 
-    for (let i = 0; i < a.length; i++)
+    if (a === b)
     {
-      if (!equals(a[i], b[i]))
+      return true
+    }
+
+    const ta: string = typeof a
+    const tb: string = typeof b
+
+    if (ta !== tb)
+    {
+      return false
+    }
+
+    if (isDate(a) && isDate(b))
+    {
+      return a.getTime() === b.getTime()
+    }
+
+    if (isArray(a) && isArray(b))
+    {
+      if (a.length !== b.length)
       {
         return false
       }
+
+      for (let i = 0; i < a.length; i++)
+      {
+        if (!equals(a[i], b[i]))
+        {
+          return false
+        }
+      }
+
+      return true
     }
 
-    return true
+    if (ta === 'object')
+    {
+      for (let prop in a)
+      {
+        if (!(prop in b) || !equals(a[prop], b[prop]))
+        {
+          return false
+        }
+      }
+
+      for (let prop in b)
+      {
+        if (!(prop in a))
+        {
+          return false
+        }
+      }
+
+      return true
+    }
+
+    return false
   }
 
-  if (ta === 'object')
+  function accessor (data: any, fieldPath: string, seperator: string | RegExp): Accessor
   {
-    for (let prop in a)
-    {
-      if (!(prop in b) || !equals(a[prop], b[prop]))
+    const parts: string[] = fieldPath.split(seperator)
+    const last: string = parts[parts.length - 1]
+
+    return {
+      get (): any
       {
-        return false
-      }
-    }
+        let value: any = data
 
-    for (let prop in b)
-    {
-      if (!(prop in a))
+        for (let i = 0; i < parts.length; i++)
+        {
+          const p: string = parts[i]
+
+          if (!p) continue
+
+          if (!value || !(p in value))
+          {
+            return undefined
+          }
+
+          value = value[p]
+        }
+
+        return value
+      },
+
+      set (value: any)
       {
-        return false
-      }
-    }
+        let curr: any = data
 
-    return true
-  }
+        for (let i = 0; i < parts.length - 1; i++)
+        {
+          const p: string = parts[i]
 
-  return false
-}
+          if (!p) continue
 
-function accessor (data: any, fieldPath: string): Accessor
-{
-  const parts: string[] = fieldPath.split(FIELD_SEPARATOR)
-  const last: string = parts[parts.length - 1]
+          if (!(p in curr))
+          {
+            curr[p] = {}
+          }
 
-  return {
-    get (): any
-    {
-      let value: any = data
+          curr = curr[p]
+        }
 
-      for (let i = 0; i < parts.length; i++)
+        curr[last] = value
+      },
+
+      delete (): any
       {
-        const p: string = parts[i]
+        let curr: any = data
 
-        if (!value || !(p in value))
+        for (let i = 0; i < parts.length - 1; i++)
+        {
+          const p: string = parts[i]
+
+          if (!p) continue
+
+          if (!curr || !(p in curr))
+          {
+            return undefined
+          }
+
+          curr = curr[p]
+        }
+
+        if (!curr)
         {
           return undefined
         }
 
-        value = value[p]
+        const deleting = curr[last]
+
+        delete curr[last]
+
+        return deleting
       }
-
-      return value
-    },
-
-    set (value: any)
-    {
-      let curr: any = data
-
-      for (let i = 0; i < parts.length - 1; i++)
-      {
-        const p: string = parts[i]
-
-        if (!(p in curr))
-        {
-          curr[p] = {}
-        }
-
-        curr = curr[p]
-      }
-
-      curr[last] = value
-    },
-
-    delete (): any
-    {
-      let curr: any = data
-
-      for (let i = 0; i < parts.length - 1; i++)
-      {
-        const p: string = parts[i]
-
-        if (!curr || !(p in curr))
-        {
-          return undefined
-        }
-
-        curr = curr[p]
-      }
-
-      if (!curr)
-      {
-        return undefined
-      }
-
-      const deleting = curr[last]
-
-      delete curr[last]
-
-      return deleting
-    }
-  }
-}
-
-function newId (): string
-{
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let autoId = '';
-
-  for (let i = 0; i < 20; i++)
-  {
-    autoId += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  return autoId
-}
-
-function parseValue (existing: any, value: any): any
-{
-  return value instanceof firebase.firestore.FieldValue
-    ? value.compute(existing)
-    : value
-}
-
-function parsePath (path: string): { parentPath: string, id: string }
-{
-  const parts: string[] = path.split(PATH_SEPARATOR)
-  const id: string = parts.pop() as string
-  const parentPath: string = parts.join(PATH_SEPARATOR)
-
-  return { id, parentPath }
-}
-
-function copyData (data: any): any
-{
-  let copy = data
-
-  if (isDate(data))
-  {
-    copy = new Date(data.getTime())
-  }
-  else if (isArray(data))
-  {
-    copy = data.map(copyData)
-  }
-  else if (isObject(data))
-  {
-    copy = Object.create(null)
-
-    for (var prop in data)
-    {
-      copy[prop] = copyData(data[prop])
     }
   }
 
-  return copy
-}
-
-function findLastIndex<T>(array: T[], test: ArrayItemTest<T>): number
-{
-  for (let index = array.length - 1; index >= 0; index--)
+  function newId (): string
   {
-    if (test(array[index], index))
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let autoId = '';
+
+    for (let i = 0; i < 20; i++)
     {
-      return index
+      autoId += chars.charAt(Math.floor(Math.random() * chars.length));
     }
+
+    return autoId
   }
 
-  return -1
+  function parsePath (path: string): { parentPath: string, id: string }
+  {
+    const parts: string[] = path.split(PATH_SEPARATOR)
+    const id: string = parts.pop() as string
+    const parentPath: string = parts.join(PATH_SEPARATOR)
+
+    return { id, parentPath }
+  }
+
+  function copyData (data: any): any
+  {
+    let copy = data
+
+    if (isDate(data))
+    {
+      copy = new Date(data.getTime())
+    }
+    else if (isArray(data))
+    {
+      copy = data.map(copyData)
+    }
+    else if (isObject(data))
+    {
+      copy = obj()
+
+      for (var prop in data)
+      {
+        copy[prop] = copyData(data[prop])
+      }
+    }
+
+    return copy
+  }
+
+  function findLastIndex<T>(array: T[], test: ArrayTest<T>): number
+  {
+    for (let index = array.length - 1; index >= 0; index--)
+    {
+      if (test(array[index], index))
+      {
+        return index
+      }
+    }
+
+    return -1
+  }
+
 }
 
-function findMarker(snapshots: firebase.firestore.DocumentSnapshot[], fieldPath: string, marker: any,
-  alternativeFind?: (snapshots: firebase.firestore.DocumentSnapshot[], test: ArrayItemTest<firebase.firestore.DocumentSnapshot>) => number)
-{
-  if (marker instanceof firebase.firestore.DocumentSnapshot)
-  {
-    return snapshots.findIndex(snap => snap.ref.path === marker.ref.path)
-  }
-  else
-  {
-    const test = (snap: firebase.firestore.DocumentSnapshot) => equals(snap.get(fieldPath), marker)
-
-    return alternativeFind ? alternativeFind(snapshots, test) : snapshots.findIndex(test)
-  }
-}
+export default firebase

@@ -16,14 +16,14 @@ firebase.initializeApp({
   // config for default app
 });
 
-var db = firebase.firestore();
+var fs = firebase.firestore();
 
-// db.app is available
+// fs.app is available
 
-db.doc('path/to/doc')
+fs.doc('path/to/doc')
   .set({ values: 'many', created_at: new Date() });
 
-db.collection('path/to')
+fs.collection('path/to')
   .where('values', '==', 'many')
   .orderBy('created_at')
   .onSnapshot(querySnapshot => {
@@ -36,5 +36,5 @@ Example with named app
 
 ```typescript
 var app = firebase.initializeApp({ /* config */ }, 'namedApp');
-var db = firebase.firestore('namedApp');
+var fs = firebase.firestore('namedApp');
 ```
