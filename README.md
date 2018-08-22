@@ -41,3 +41,25 @@ Example with named app
 var app = firebase.initializeApp({ /* config */ }, 'namedApp');
 var fs = firebase.firestore('namedApp');
 ```
+
+### Where can I access the stored data?
+
+- **firestoreInstance.\_docs**: an object of documents where the key is their full path
+- **firestoreInstance.\_collections**: an object of collections (array of document ids) where the key is their full path
+
+### Currently Unsupported Functionality
+
+- firebase#database
+- firebase.Promise#all
+- firebase.app.App#auth
+- firebase.app.App#database
+- firebase.app.App#delete
+- firebase.app.App#messaging
+- firebase.app.App#storage
+- firebase.firestore.Firestore#disableNetwork
+- firebase.firestore.Firestore#enableNetwork
+- firebase.firestore.Firestore#enablePersistence
+- firebase.firestore.Firestore#setLogLevel
+- firebase.firestore.FieldPath
+- firebase.firestore.Transaction
+- firebase.firestore.WriteBatch
