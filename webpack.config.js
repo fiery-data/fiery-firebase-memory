@@ -16,11 +16,9 @@ module.exports = {
   },
   output: {
     filename: 'fiery-firebase-memory.js',
-    path: path.resolve(__dirname, 'dist')
-    /*,
-    library: 'VueFiery',
+    path: path.resolve(__dirname, 'dist'),
+    library: 'firebase',
     libraryTarget: 'umd',
     libraryExport: 'default'
-    */
   }
 };

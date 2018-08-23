@@ -1,6 +1,6 @@
 {
     "name": "fiery-firebase-memory",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "author": "Philip Diffenderfer",
     "description": "An in memory TypeScript/JS clone of Firebase & Firestore",
     "license": "MIT",
@@ -9,7 +9,7 @@
     "scripts": {
         "dev": "webpack --mode development",
         "build": "webpack --mode production",
-        "test": "mocha -r ts-node/register tests/**/*.ts"
+        "test": "mocha -r   ts-node/register tests/**/*.ts"
     },
     "keywords": [
         "fiery",
