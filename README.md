@@ -50,7 +50,6 @@ var fs = firebase.firestore('namedApp');
 ### Currently Unsupported Functionality
 
 - firebase#database
-- firebase.Promise#all
 - firebase.app.App#auth
 - firebase.app.App#database
 - firebase.app.App#delete

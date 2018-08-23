@@ -1,10 +1,11 @@
 {
     "name": "fiery-firebase-memory",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "author": "Philip Diffenderfer",
     "description": "An in memory TypeScript/JS clone of Firebase & Firestore",
     "license": "MIT",
-    "main": "./dist/fiery-firebase-memory.js",
+    "main": "dist/fiery-firebase-memory.js",
+    "typings": "dist/types/index.d.ts",
     "scripts": {
         "dev": "webpack --mode development",
         "build": "webpack --mode production",

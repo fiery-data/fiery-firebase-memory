@@ -28,6 +28,32 @@ describe('document', () =>
     expect(collection).to.deep.equal(['admin'])
   })
 
+  it ('chains sync', () =>
+  {
+    const APP = 'document chains sync'
+    let app = firebase.initializeApp({}, APP)
+    let db = firebase.firestore(APP)
+
+    db.doc('role/admin').set({name: 'Chains', admin: '3'})
+    db.doc('admin/3').set({name: 'Thomas'})
+
+    let chained = 0
+
+    db.collection('role')
+      .doc('admin').get()
+      .then(role => {
+        chained++
+        expect(role.get('name')).to.equal('Chains')
+        return db.collection('admin').doc(role.get('admin')).get()
+      })
+      .then(admin => {
+        chained++
+        expect(admin.get('name')).to.equal('Thomas')
+      })
+
+    expect(chained).to.equal(2)
+  })
+
   it ('merges', () =>
   {
     const APP = 'document merges'

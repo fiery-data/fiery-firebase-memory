@@ -15,9 +15,12 @@
     "sourceMap": true,
     "allowJs": false,
     "sourceMap": true,
-    "outDir": "./dist/"
+    "strict": true,
+    "declaration": true,
+    "declarationDir": "types",
+    "outDir": "dist"
   },
   "include": [
-    "src/**/*.ts"
+    "src"
   ]
 }
