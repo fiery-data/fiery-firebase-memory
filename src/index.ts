@@ -1677,7 +1677,11 @@ export namespace firebase
   {
     let copy = data
 
-    if (isDate(data))
+    if (isBoolean(data) || !isValue(data) || isString(data) || isNumber(data))
+    {
+      return data
+    }
+    else if (isDate(data))
     {
       copy = new Date(data.getTime())
     }
