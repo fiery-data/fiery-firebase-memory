@@ -125,7 +125,17 @@ export namespace firebase
 
     type SnapshotError = (error: any) => any
 
-    type ChangeType = 'added' | 'modified' | 'removed'
+    type DocumentChangeType = 'added' | 'modified' | 'removed'
+
+    type WhereFilterOp = '<' | '<=' | '==' | '>=' | '>' | 'array-contains' | 'array_contains'
+
+    type OrderByDirection = 'desc' | 'asc'
+
+    type DocumentData = { [field: string]: any }
+
+    type UpdateData = { [fieldPath: string]: any }
+
+    type LogLevel = 'debug' | 'error' | 'silent'
 
 
     export class Firestore
@@ -160,35 +170,35 @@ export namespace firebase
         return new DocumentReference(this, documentPath)
       }
 
-      public disableNetwork (): firebase.Promise<void>
+      public disableNetwork (): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.disableNetwork is not supported'
       }
 
-      public enableNetwork (): firebase.Promise<void>
+      public enableNetwork (): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.enableNetwork is not supported'
       }
 
-      public enablePersistence (): firebase.Promise<void>
+      public enablePersistence (): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.enablePersistence is not supported'
       }
 
-      public setLogLevel (logLevel: string): void
+      public setLogLevel (logLevel: LogLevel): void
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.setLogLevel is not supported'
       }
 
-      public runTransaction (updateFunction: (transaction: Transaction) => Promise<any>): firebase.Promise<any>
+      public runTransaction<T> (updateFunction: (transaction: Transaction) => Promise<T>): Promise<T>
       {
         const trans = new Transaction()
 
@@ -312,24 +322,52 @@ export namespace firebase
         this._path = path
       }
 
-      public endAt (...snapshotOrVarArgs: any[]): Query
+      public endAt (snapshot: DocumentSnapshot): Query
+      public endAt (...fieldValues: any[]): Query
       {
-        return this.extend(q => q._endAt = q._endAt.concat(snapshotOrVarArgs))
+        return this.extend(q => {
+          if (fieldValues instanceof DocumentSnapshot) {
+            q._endAt.push(fieldValues)
+          } else {
+            q._endAt = q._endAt.concat(fieldValues)
+          }
+        })
       }
 
-      public endBefore (...snapshotOrVarArgs: any[]): Query
+      public endBefore (snapshot: DocumentSnapshot): Query
+      public endBefore (...fieldValues: any[]): Query
       {
-        return this.extend(q => q._endBefore = q._endBefore.concat(snapshotOrVarArgs))
+        return this.extend(q => {
+          if (fieldValues instanceof DocumentSnapshot) {
+            q._endBefore.push(fieldValues)
+          } else {
+            q._endBefore = q._endBefore.concat(fieldValues)
+          }
+        })
       }
 
-      public startAfter (...snapshotOrVarArgs: any[]): Query
+      public startAfter (snapshot: DocumentSnapshot): Query
+      public startAfter (...fieldValues: any[]): Query
       {
-        return this.extend(q => q._startAfter = q._startAfter.concat(snapshotOrVarArgs))
+        return this.extend(q => {
+          if (fieldValues instanceof DocumentSnapshot) {
+            q._startAfter.push(fieldValues)
+          } else {
+            q._startAfter = q._startAfter.concat(fieldValues)
+          }
+        })
       }
 
-      public startAt (...snapshotOrVarArgs: any[]): Query
+      public startAt (snapshot: DocumentSnapshot): Query
+      public startAt (...fieldValues: any[]): Query
       {
-        return this.extend(q => q._startAt = q._startAt.concat(snapshotOrVarArgs))
+        return this.extend(q => {
+          if (fieldValues instanceof DocumentSnapshot) {
+            q._startAt.push(fieldValues)
+          } else {
+            q._startAt = q._startAt.concat(fieldValues)
+          }
+        })
       }
 
       public limit (limit: number): Query
@@ -337,19 +375,19 @@ export namespace firebase
         return this.extend(q => q._limit = limit)
       }
 
-      public orderBy (fieldPath: string, directionStr: string = 'asc'): Query
+      public orderBy (fieldPath: string, directionStr: OrderByDirection = 'asc'): Query
       {
         return this.extend(q => q._orderBy.push(new OrderBy(fieldPath, directionStr)))
       }
 
-      public where (fieldPath: string, operationStr: string, value: any): Query
+      public where (fieldPath: string, operationStr: WhereFilterOp, value: any): Query
       {
         return this.extend(q => q._where.push(new Where(fieldPath, operationStr, value)))
       }
 
-      public get (options?: GetOptions): firebase.Promise<QuerySnapshot>
+      public get (options?: GetOptions): Promise<QuerySnapshot>
       {
-        return firebase.Promise.resolve(new QuerySnapshot(this, [], this.getResults()))
+        return Promise.resolve(new QuerySnapshot(this, [], this.getResults()))
       }
 
       public onSnapshot (
@@ -628,12 +666,12 @@ export namespace firebase
         this._data = data
       }
 
-      public data (): any
+      public data (options?: SnapshotOptions): DocumentData
       {
         return this._data
       }
 
-      public get (fieldPath: string): any
+      public get (fieldPath: string, options?: SnapshotOptions): any
       {
         return accessor(this._data, fieldPath, FIELD_SEPERATOR).get()
       }
@@ -700,7 +738,7 @@ export namespace firebase
         return changes
       }
 
-      public forEach (callback: (snapshot: QueryDocumentSnapshot, index: number) => any, thisArg?: any)
+      public forEach (callback: (snapshot: QueryDocumentSnapshot) => void, thisArg?: any)
       {
         this._next.forEach(callback.bind(thisArg))
       }
@@ -730,6 +768,7 @@ export namespace firebase
     export class CollectionReference extends Query
     {
       public readonly id: string
+      public readonly path: string
 
       readonly _documentPath: string
 
@@ -740,6 +779,7 @@ export namespace firebase
         super(firestore, path)
 
         this.id = id
+        this.path = path
         this._documentPath = parentPath
       }
 
@@ -753,14 +793,20 @@ export namespace firebase
         return this.firestore.doc(this._path + PATH_SEPARATOR + (documentPath || newId()))
       }
 
-      public add (data: any): firebase.Promise<DocumentReference>
+      public add (data: DocumentData): Promise<DocumentReference>
       {
-        return this.doc().set(data)
+        const doc = this.doc()
+
+        return new Promise((resolve, reject) => {
+          doc.set(data)
+            .then(() => resolve(doc))
+            .catch((error) => reject(error))
+        })
       }
 
       public isEqual (other: CollectionReference): boolean
       {
-        return other._path === this._path
+        return other.path === this.path
       }
     }
 
@@ -792,7 +838,12 @@ export namespace firebase
         return this.firestore.collection(this.path + PATH_SEPARATOR + collectionPath)
       }
 
-      public set (data: any, options?: SetOptions): firebase.Promise<DocumentReference>
+      public isEqual (other: DocumentReference): boolean
+      {
+        return this.path === other.path
+      }
+
+      public set (data: DocumentData, options?: SetOptions): Promise<void>
       {
         if (!options || !options.merge)
         {
@@ -802,10 +853,10 @@ export namespace firebase
         this.applyValues(data)
         this.notify()
 
-        return firebase.Promise.resolve(this as DocumentReference)
+        return Promise.resolve()
       }
 
-      public delete (): firebase.Promise<void>
+      public delete (): Promise<void>
       {
         if (this.firestore.dataAt(this.path))
         {
@@ -813,20 +864,21 @@ export namespace firebase
           this.notify()
         }
 
-        return firebase.Promise.resolve()
+        return Promise.resolve()
       }
 
-      public update (data: any): firebase.Promise<void>
+      //update (field: string | FieldPath, value: any, ...moreFieldsAndValues: any[]): Promise<void>
+      public update (data: UpdateData): Promise<void>
       {
         this.applyValues(data)
         this.notify()
 
-        return firebase.Promise.resolve()
+        return Promise.resolve()
       }
 
-      public get (options?: GetOptions): firebase.Promise<DocumentSnapshot>
+      public get (options?: GetOptions): Promise<DocumentSnapshot>
       {
-        return firebase.Promise.resolve(this.snapshot())
+        return Promise.resolve(this.snapshot())
       }
 
       public onSnapshot (
@@ -869,7 +921,7 @@ export namespace firebase
         this.firestore.dataAtRemove(this.path)
       }
 
-      applyValues (values: any): void
+      applyValues (values: UpdateData | DocumentData): void
       {
         const data: any = this.firestore.dataAt(this.path, true)
 
@@ -929,23 +981,29 @@ export namespace firebase
     export class Timestamp
     {
 
-      readonly _seconds: number
-      readonly _nanoseconds: number
+      readonly seconds: number
+      readonly nanoseconds: number
 
       public constructor (seconds: number, nanoseconds: number = 0)
       {
-        this._seconds = seconds
-        this._nanoseconds = nanoseconds
+        this.seconds = seconds
+        this.nanoseconds = nanoseconds
       }
 
       public toMillis (): number
       {
-        return this._seconds * 1000 + Math.floor(this._nanoseconds * 0.000001)
+        return this.seconds * 1000 + Math.floor(this.nanoseconds * 0.000001)
       }
 
       public toDate (): Date
       {
         return new Date(this.toMillis())
+      }
+
+      public isEqual (other: Timestamp): boolean
+      {
+        return this.seconds === other.seconds
+            && this.nanoseconds === other.nanoseconds
       }
 
       public static fromMillis (millis: number): Timestamp
@@ -966,52 +1024,90 @@ export namespace firebase
 
     export class Transaction
     {
-      // TODO
+      public get (documentRef: DocumentReference): Promise<DocumentSnapshot>
+      {
+        throw 'firebase.firestore.Transaction.get not supported'
+      }
+
+      public set (documentRef: DocumentReference, data: DocumentData, options?: SetOptions): Transaction
+      {
+        throw 'firebase.firestore.Transaction.set not supported'
+      }
+
+      public update (documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction
+      {
+        throw 'firebase.firestore.Transaction.update not supported'
+      }
+
+      public delete (documentRef: DocumentReference): Transaction
+      {
+        throw 'firebase.firestore.Transaction.delete not supported'
+      }
     }
 
     export class WriteBatch
     {
-      // TODO
+      public set (documentRef: DocumentReference, data: DocumentData, options?: SetOptions): WriteBatch
+      {
+        throw 'firebase.firestore.WriteBatch.set not supported'
+      }
+
+      public update (documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction
+      {
+        throw 'firebase.firestore.WriteBatch.update not supported'
+      }
+
+      public delete (documentRef: DocumentReference): Transaction
+      {
+        throw 'firebase.firestore.WriteBatch.delete not supported'
+      }
+
+      public commit (): Promise<void>
+      {
+        throw 'firebase.firestore.WriteBatch.commit not supported'
+      }
     }
 
     export interface QueryListenOptions
     {
-      includeDocumentMetadataChanges?: boolean
-      includeQueryMetadataChanges?: boolean
+      readonly includeDocumentMetadataChanges?: boolean
+      readonly includeQueryMetadataChanges?: boolean
     }
 
     export interface SnapshotMetadata
     {
-      fromCache: boolean
-      hasPendingWrites: boolean
+      readonly fromCache: boolean
+      readonly hasPendingWrites: boolean
     }
 
     export interface Settings
     {
+      host?: string
+      ssl?: boolean
       timestampsInSnapshots?: boolean
     }
 
     export interface GetOptions
     {
-      source?: 'default' | 'server' | 'client'
+      readonly source?: 'default' | 'server' | 'client'
     }
 
     export interface SetOptions
     {
-      merge?: boolean
+      readonly merge?: boolean
     }
 
     export interface SnapshotOptions
     {
-      serverTimestamps?: 'estimate' | 'previous' | 'none'
+      readonly serverTimestamps?: 'estimate' | 'previous' | 'none'
     }
 
     export interface DocumentChange
     {
-      doc: DocumentSnapshot
-      type: ChangeType
-      newIndex: number
-      oldIndex: number
+      readonly doc: QueryDocumentSnapshot
+      readonly type: DocumentChangeType
+      readonly newIndex: number
+      readonly oldIndex: number
     }
 
     export interface SnapshotListenOptions
@@ -1019,13 +1115,18 @@ export namespace firebase
       includeMetadataChanges?: boolean
     }
 
+    export interface DocumentListenOptions
+    {
+      readonly includeMetadataChanges?: boolean
+    }
+
     class Where
     {
       readonly _fieldPath: string
-      readonly _opStr: string
+      readonly _opStr: WhereFilterOp
       readonly _value: any
 
-      public constructor (fieldPath: string, opStr: string, value: any)
+      public constructor (fieldPath: string, opStr: WhereFilterOp, value: any)
       {
         this._fieldPath = fieldPath
         this._opStr = opStr
@@ -1065,9 +1166,9 @@ export namespace firebase
     class OrderBy
     {
       readonly _fieldPath: string
-      readonly _directionStr: string
+      readonly _directionStr: OrderByDirection
 
-      public constructor (fieldPath: string, directionStr: string)
+      public constructor (fieldPath: string, directionStr: OrderByDirection)
       {
         this._fieldPath = fieldPath
         this._directionStr = directionStr
@@ -1839,9 +1940,9 @@ namespace firebase
         return handler
       }
 
-      public once (eventType: EventType, callback?: SnapshotCallback, failureCallbackOrContext?: (error: Error) => any | object, context?: object): firebase.Promise<DataSnapshot>
+      public once (eventType: EventType, callback?: SnapshotCallback, failureCallbackOrContext?: (error: Error) => any | object, context?: object): Promise<DataSnapshot>
       {
-        const promise = new firebase.Promise<DataSnapshot>()
+        const promise = new Promise<DataSnapshot>()
         const handler = this.on(eventType, (snapshot, key) =>
         {
           if (callback)
@@ -1947,7 +2048,7 @@ namespace firebase
         return new ThenableReference(this._database, this._path)
       }
 
-      public set (value: any, onComplete?: OnComplete): firebase.Promise<void>
+      public set (value: any, onComplete?: OnComplete): Promise<void>
       {
         if (!isValue(value))
         {
@@ -1960,14 +2061,14 @@ namespace firebase
         return this.getCompletePromise(onComplete)
       }
 
-      public update (values: any, onComplete?: OnComplete): firebase.Promise<void>
+      public update (values: any, onComplete?: OnComplete): Promise<void>
       {
         // TODO https://firebase.google.com/docs/reference/js/firebase.database.Reference#update
 
         return this.getCompletePromise(onComplete)
       }
 
-      public remove (onComplete?: OnComplete): firebase.Promise<void>
+      public remove (onComplete?: OnComplete): Promise<void>
       {
         const db = this._database
         db.priorityAtRemove(this._path)
@@ -1976,7 +2077,7 @@ namespace firebase
         return this.getCompletePromise(onComplete)
       }
 
-      public setWithPriority (newVal: any, newPriority: Priority, onComplete?: OnComplete): firebase.Promise<void>
+      public setWithPriority (newVal: any, newPriority: Priority, onComplete?: OnComplete): Promise<void>
       {
         const setPromise = this.set(newVal, onComplete)
 
@@ -1986,7 +2087,7 @@ namespace firebase
         return setPromise
       }
 
-      public setPriority (priority: Priority, onComplete?: OnComplete): firebase.Promise<void>
+      public setPriority (priority: Priority, onComplete?: OnComplete): Promise<void>
       {
         const db = this._database
         db.priorityAtSet(this._path, priority)
@@ -1994,7 +2095,7 @@ namespace firebase
         return this.getCompletePromise(onComplete)
       }
 
-      public transaction (transactionUpdate: (value: any) => any, onComplete?: OnComplete, applyLocally: boolean = true): firebase.Promise<TransactionResult>
+      public transaction (transactionUpdate: (value: any) => any, onComplete?: OnComplete, applyLocally: boolean = true): Promise<TransactionResult>
       {
         const data = this._database.dataAt(this._path)
         const updated = transactionUpdate(data)
@@ -2004,12 +2105,12 @@ namespace firebase
 
         this.set(updated)
 
-        return new firebase.Promise<TransactionResult>().resolve(result)
+        return new Promise<TransactionResult>().resolve(result)
       }
 
-      getCompletePromise (onComplete?: OnComplete): firebase.Promise<void>
+      getCompletePromise (onComplete?: OnComplete): Promise<void>
       {
-        return new firebase.Promise<void>()
+        return new Promise<void>()
           .then(onComplete as (resolved: void) => any)
           .catch(onComplete as (error: Error) => any)
           .resolve(void 0)
@@ -2145,7 +2246,7 @@ namespace firebase
         this._disconnects = []
       }
 
-      public cancel (onComplete?: OnComplete): firebase.Promise<void>
+      public cancel (onComplete?: OnComplete): Promise<void>
       {
         this._disconnects.forEach(d => this._ref._database.removeDisconnect(d))
         this._disconnects.length = 0
@@ -2153,29 +2254,29 @@ namespace firebase
         return this._ref.getCompletePromise(onComplete)
       }
 
-      public remove (onComplete?: OnComplete): firebase.Promise<void>
+      public remove (onComplete?: OnComplete): Promise<void>
       {
         return this.addDisconnect(onComplete, () => this._ref.remove(onComplete))
       }
 
-      public set (value: any, onComplete?: OnComplete): firebase.Promise<void>
+      public set (value: any, onComplete?: OnComplete): Promise<void>
       {
         return this.addDisconnect(onComplete, () => this._ref.set(value, onComplete))
       }
 
-      public update (values: any, onComplete?: OnComplete): firebase.Promise<void>
+      public update (values: any, onComplete?: OnComplete): Promise<void>
       {
         return this.addDisconnect(onComplete, () => this._ref.update(values, onComplete))
       }
 
-      public setWithPriority (newVal: any, newPriority: Priority, onComplete?: OnComplete): firebase.Promise<void>
+      public setWithPriority (newVal: any, newPriority: Priority, onComplete?: OnComplete): Promise<void>
       {
         return this.addDisconnect(onComplete, () => this._ref.setWithPriority(newVal, newPriority, onComplete))
       }
 
-      addDisconnect (onComplete: OnComplete | undefined, action: () => firebase.Promise<void>): firebase.Promise<void>
+      addDisconnect (onComplete: OnComplete | undefined, action: () => Promise<void>): Promise<void>
       {
-        const promise = new firebase.Promise<void>()
+        const promise = new Promise<void>()
 
         const disconnect: DisconnectCallback = () =>
         {
