@@ -17,10 +17,8 @@ module.exports = {
   output: {
     filename: 'fiery-firebase-memory.js',
     path: path.resolve(__dirname, 'dist'),
-    globalObject: 'typeof self !== \'undefined\' ? self : this',
     library: 'firebase',
     libraryTarget: 'umd',
-    libraryExport: 'default',
     umdNamedDefine: true
   }
 };
