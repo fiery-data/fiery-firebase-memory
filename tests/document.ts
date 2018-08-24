@@ -11,7 +11,7 @@ describe('document', () =>
   {
     const APP = 'document sets'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
 
     db.collection('role').doc('admin').set({
       name: 'Administrator',
@@ -32,7 +32,7 @@ describe('document', () =>
   {
     const APP = 'document chains sync'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
 
     db.doc('role/admin').set({name: 'Chains', admin: '3'})
     db.doc('admin/3').set({name: 'Thomas'})
@@ -58,7 +58,7 @@ describe('document', () =>
   {
     const APP = 'document merges'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
 
     let docRef = db.collection('person').doc()
     docRef.set({
@@ -89,7 +89,7 @@ describe('document', () =>
   {
     const APP = 'document get'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let gets = 0
     let errors = 0
 
@@ -121,7 +121,7 @@ describe('document', () =>
   {
     const APP = 'document realtime'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let updates = 0
     let errors = 0
     let miles = [123456, 654321, 666]
@@ -166,7 +166,7 @@ describe('document', () =>
   {
     const APP = 'document deletes'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let updates = 0
     let deletes = 0
     let errors = 0

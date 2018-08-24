@@ -11,7 +11,7 @@ describe('query', () =>
   {
     const APP = 'query get simple'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let gets = 0
     let errors = 0
 
@@ -44,7 +44,7 @@ describe('query', () =>
   {
     const APP = 'query get order'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let gets = 0
     let errors = 0
 
@@ -78,7 +78,7 @@ describe('query', () =>
   {
     const APP = 'query realtime'
     let app = firebase.initializeApp({}, APP)
-    let db = firebase.firestore(APP)
+    let db = firebase.firestore(app)
     let gets = 0
     let errors = 0
 

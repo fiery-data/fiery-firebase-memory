@@ -37,7 +37,7 @@ export namespace firebase
     export class App
     {
       public readonly name: string
-      public readonly options: object
+      public readonly options: Object
 
       firebase_: any
       // database_: firebase.database.Database
@@ -77,7 +77,7 @@ export namespace firebase
         return this.firestore_
       }
 
-      public delete ()
+      public delete (): Promise<any>
       {
         throw 'firebase.app.App.delete is not supported'
       }
@@ -94,14 +94,9 @@ export namespace firebase
     }
   }
 
-  export function firestore(nameOrApp?: string | firebase.app.App): firebase.firestore.Firestore
+  export function firestore(app?: firebase.app.App): firebase.firestore.Firestore
   {
-    const app: firebase.app.App =
-      nameOrApp instanceof firebase.app.App
-      ? nameOrApp as firebase.app.App
-      : firebase.app(nameOrApp)
-
-    return app.firestore()
+    return (app || firebase.app()).firestore()
   }
 
   export namespace firestore
@@ -115,13 +110,13 @@ export namespace firebase
 
     type CollectionsMap = { [path: string]: string[] }
 
-    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => any
+    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => void
 
     type QuerySnapshotError = (error: any) => any
 
     export type QueryDocumentSnapshot = DocumentSnapshot
 
-    type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any
+    type SnapshotObserver = (snapshot: DocumentSnapshot) => void
 
     type SnapshotError = (error: any) => any
 
@@ -137,6 +132,17 @@ export namespace firebase
 
     type LogLevel = 'debug' | 'error' | 'silent'
 
+    const defaultMetadata: SnapshotMetadata =
+    {
+      fromCache:  false,
+      hasPendingWrites: false,
+
+      isEqual (other: SnapshotMetadata): boolean
+      {
+        return this.fromCache === other.fromCache
+            && this.hasPendingWrites === other.hasPendingWrites
+      }
+    }
 
     export class Firestore
     {
@@ -153,6 +159,18 @@ export namespace firebase
         this._docs = obj()
         this._collections = obj()
         this._listeners = obj()
+
+        this.INTERNAL =
+        {
+          delete: () =>
+          {
+            this._docs = obj()
+            this._collections = obj()
+            this._listeners = obj()
+
+            return Promise.resolve()
+          }
+        }
       }
 
       public batch (): WriteBatch
@@ -209,6 +227,8 @@ export namespace firebase
       {
         this._settings = settings
       }
+
+      INTERNAL: { delete: () => Promise<void> }
 
       dataAt (path: string, create: boolean = false)
       {
@@ -388,6 +408,11 @@ export namespace firebase
       public get (options?: GetOptions): Promise<QuerySnapshot>
       {
         return Promise.resolve(new QuerySnapshot(this, [], this.getResults()))
+      }
+
+      public isEqual (other: Query): boolean
+      {
+        return false // TODO
       }
 
       public onSnapshot (
@@ -588,6 +613,11 @@ export namespace firebase
         this.compute = compute
       }
 
+      public isEqual (other: FieldValue): boolean
+      {
+        return false
+      }
+
       public static arrayRemove (...values: any[]): FieldValue
       {
         return new FieldValue(existing =>
@@ -653,7 +683,7 @@ export namespace firebase
     {
       public readonly exists: boolean
       public readonly id: string
-      public readonly metadata: SnapshotMetadata = { fromCache: true, hasPendingWrites: false }
+      public readonly metadata: SnapshotMetadata = defaultMetadata
       public readonly ref: DocumentReference
 
       readonly _data: any
@@ -666,14 +696,14 @@ export namespace firebase
         this._data = data
       }
 
-      public data (options?: SnapshotOptions): DocumentData
+      public data (options?: SnapshotOptions): DocumentData | undefined
       {
         return this._data
       }
 
-      public get (fieldPath: string, options?: SnapshotOptions): any
+      public get (fieldPath: string | FieldPath, options?: SnapshotOptions): any
       {
-        return accessor(this._data, fieldPath, FIELD_SEPERATOR).get()
+        return accessor(this._data, fieldPath as string, FIELD_SEPERATOR).get()
       }
 
       public isEqual (other: DocumentSnapshot): boolean
@@ -686,7 +716,7 @@ export namespace firebase
     {
       public readonly docs: QueryDocumentSnapshot[]
       public readonly empty: boolean
-      public readonly metadata: SnapshotMetadata = { fromCache: true, hasPendingWrites: false }
+      public readonly metadata: SnapshotMetadata = defaultMetadata
       public readonly query: Query
       public readonly size: number
 
@@ -783,9 +813,9 @@ export namespace firebase
         this._documentPath = parentPath
       }
 
-      public get parent (): DocumentReference
+      public get parent (): DocumentReference | null
       {
-        return this.firestore.doc(this._documentPath)
+        return this._documentPath ? this.firestore.doc(this._documentPath) : null
       }
 
       public doc (documentPath?: string): DocumentReference
@@ -867,7 +897,7 @@ export namespace firebase
         return Promise.resolve()
       }
 
-      //update (field: string | FieldPath, value: any, ...moreFieldsAndValues: any[]): Promise<void>
+      public update (field: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Promise<void>
       public update (data: UpdateData): Promise<void>
       {
         this.applyValues(data)
@@ -882,11 +912,11 @@ export namespace firebase
       }
 
       public onSnapshot (
-        optionsOrObserverOrOnNext: SnapshotListenOptions | SnapshotObserver,
+        optionsOrObserverOrOnNext: DocumentListenOptions | SnapshotObserver,
         observerOrOnNextOrOnError?: SnapshotObserver | SnapshotError,
         onError?: SnapshotError): Off
       {
-        const options: SnapshotListenOptions | undefined = (
+        const options: DocumentListenOptions | undefined = (
           !isFunction(optionsOrObserverOrOnNext)
           ? optionsOrObserverOrOnNext
           : undefined)
@@ -957,7 +987,20 @@ export namespace firebase
 
     export class FieldPath
     {
+      public constructor(...fieldNames: string[])
+      {
 
+      }
+
+      public isEqual (other: FieldPath): boolean
+      {
+        return false // TODO
+      }
+
+      public static documentId (): FieldPath
+      {
+        return new FieldPath()
+      }
     }
 
     export class GeoPoint
@@ -1078,6 +1121,8 @@ export namespace firebase
     {
       readonly fromCache: boolean
       readonly hasPendingWrites: boolean
+
+      isEqual(other: SnapshotMetadata): boolean
     }
 
     export interface Settings

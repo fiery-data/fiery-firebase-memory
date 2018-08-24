@@ -6,19 +6,19 @@ export declare namespace firebase {
     namespace app {
         class App {
             readonly name: string;
-            readonly options: object;
+            readonly options: Object;
             firebase_: any;
             firestore_: firebase.firestore.Firestore | undefined;
             constructor(options: object, name: string);
             auth(): void;
             database(): void;
             firestore(): firebase.firestore.Firestore;
-            delete(): void;
+            delete(): Promise<any>;
             messaging(): void;
             storage(): void;
         }
     }
-    function firestore(nameOrApp?: string | firebase.app.App): firebase.firestore.Firestore;
+    function firestore(app?: firebase.app.App): firebase.firestore.Firestore;
     namespace firestore {
         type Off = () => any;
         type ListenerMap = {
@@ -30,10 +30,10 @@ export declare namespace firebase {
         type CollectionsMap = {
             [path: string]: string[];
         };
-        type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => any;
+        type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => void;
         type QuerySnapshotError = (error: any) => any;
         type QueryDocumentSnapshot = DocumentSnapshot;
-        type SnapshotObserver = (snapshot: firebase.firestore.DocumentSnapshot) => any;
+        type SnapshotObserver = (snapshot: DocumentSnapshot) => void;
         type SnapshotError = (error: any) => any;
         type DocumentChangeType = 'added' | 'modified' | 'removed';
         type WhereFilterOp = '<' | '<=' | '==' | '>=' | '>' | 'array-contains' | 'array_contains';
@@ -61,6 +61,9 @@ export declare namespace firebase {
             setLogLevel(logLevel: LogLevel): void;
             runTransaction<T>(updateFunction: (transaction: Transaction) => Promise<T>): Promise<T>;
             settings(settings: Settings): void;
+            INTERNAL: {
+                delete: () => Promise<void>;
+            };
             dataAt(path: string, create?: boolean): any;
             dataAtRemove(path: string): void;
             documentsAt(path: string, create?: boolean): string[];
@@ -89,6 +92,7 @@ export declare namespace firebase {
             orderBy(fieldPath: string, directionStr?: OrderByDirection): Query;
             where(fieldPath: string, operationStr: WhereFilterOp, value: any): Query;
             get(options?: GetOptions): Promise<QuerySnapshot>;
+            isEqual(other: Query): boolean;
             onSnapshot(optionsOrObserverOrOnNext: QueryListenOptions | QuerySnapshotObserver, observerOrOnNextOrOnError?: QuerySnapshotObserver | QuerySnapshotError, onError?: QuerySnapshotError): Off;
             extend(modify?: (copy: Query) => any): Query;
             getResults(): QueryDocumentSnapshot[];
@@ -96,6 +100,7 @@ export declare namespace firebase {
         class FieldValue {
             readonly compute: (existing: any) => any;
             constructor(compute: (existing: any) => any);
+            isEqual(other: FieldValue): boolean;
             static arrayRemove(...values: any[]): FieldValue;
             static arrayUnion(...values: any[]): FieldValue;
             static delete(): FieldValue;
@@ -108,8 +113,8 @@ export declare namespace firebase {
             readonly ref: DocumentReference;
             readonly _data: any;
             constructor(id: string, data: any, ref: DocumentReference);
-            data(options?: SnapshotOptions): DocumentData;
-            get(fieldPath: string, options?: SnapshotOptions): any;
+            data(options?: SnapshotOptions): DocumentData | undefined;
+            get(fieldPath: string | FieldPath, options?: SnapshotOptions): any;
             isEqual(other: DocumentSnapshot): boolean;
         }
         class QuerySnapshot {
@@ -130,7 +135,7 @@ export declare namespace firebase {
             readonly path: string;
             readonly _documentPath: string;
             constructor(firestore: Firestore, path: string);
-            readonly parent: DocumentReference;
+            readonly parent: DocumentReference | null;
             doc(documentPath?: string): DocumentReference;
             add(data: DocumentData): Promise<DocumentReference>;
             isEqual(other: CollectionReference): boolean;
@@ -146,15 +151,18 @@ export declare namespace firebase {
             isEqual(other: DocumentReference): boolean;
             set(data: DocumentData, options?: SetOptions): Promise<void>;
             delete(): Promise<void>;
-            update(data: UpdateData): Promise<void>;
+            update(field: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Promise<void>;
             get(options?: GetOptions): Promise<DocumentSnapshot>;
-            onSnapshot(optionsOrObserverOrOnNext: SnapshotListenOptions | SnapshotObserver, observerOrOnNextOrOnError?: SnapshotObserver | SnapshotError, onError?: SnapshotError): Off;
+            onSnapshot(optionsOrObserverOrOnNext: DocumentListenOptions | SnapshotObserver, observerOrOnNextOrOnError?: SnapshotObserver | SnapshotError, onError?: SnapshotError): Off;
             clearValues(): void;
             applyValues(values: UpdateData | DocumentData): void;
             notify(): void;
             snapshot(): DocumentSnapshot;
         }
         class FieldPath {
+            constructor(...fieldNames: string[]);
+            isEqual(other: FieldPath): boolean;
+            static documentId(): FieldPath;
         }
         class GeoPoint {
             latitude: number;
@@ -192,6 +200,7 @@ export declare namespace firebase {
         interface SnapshotMetadata {
             readonly fromCache: boolean;
             readonly hasPendingWrites: boolean;
+            isEqual(other: SnapshotMetadata): boolean;
         }
         interface Settings {
             host?: string;
