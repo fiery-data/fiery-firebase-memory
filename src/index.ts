@@ -826,9 +826,10 @@ export namespace firebase
       public add (data: DocumentData): Promise<DocumentReference>
       {
         const doc = this.doc()
+        const setPromise = doc.set(data)
 
         return new Promise((resolve, reject) => {
-          doc.set(data)
+          setPromise
             .then(() => resolve(doc))
             .catch((error) => reject(error))
         })
@@ -1252,6 +1253,8 @@ export namespace firebase
     }
   }
 
+  /* use ES6 Promise
+
   class Deferred<T, R>
   {
     resolve: Resolver<R, any>
@@ -1396,6 +1399,7 @@ export namespace firebase
       })
     }
   }
+  */
 
   const PATH_SEPARATOR: string = '/'
 

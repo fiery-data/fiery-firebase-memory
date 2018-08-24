@@ -242,30 +242,5 @@ export declare namespace firebase {
             compare(a: DocumentSnapshot, b: DocumentSnapshot): number;
         }
     }
-    class Deferred<T, R> {
-        resolve: Resolver<R, any>;
-        reject: Rejecter;
-        next: Promise<R>;
-        callback: Resolver<T, R>;
-        constructor(callback: Resolver<T, R>);
-        resolved(value: T): void;
-        rejected(reason: Error): void;
-    }
-    class Promise<T> {
-        _done: boolean;
-        _resolved: boolean;
-        _value: T | undefined;
-        _error: Error | undefined;
-        _rejecters: Rejecter[];
-        _nexts: Deferred<T, any>[];
-        constructor(callback: (resolve: Resolver<T, any>, reject: Rejecter) => void);
-        then<R>(resolve: Resolver<T, R>): Promise<R>;
-        catch(reject: Rejecter): this;
-        static resolve<T>(resolved?: T): Promise<T>;
-        static reject<T>(reason?: Error): Promise<T>;
-        static all<T>(promises: Promise<T>[]): Promise<T>;
-    }
-    type Resolver<T, R> = (value: T) => void | Promise<R>;
-    type Rejecter = (reason: Error) => void;
 }
 export default firebase;

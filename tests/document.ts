@@ -1,7 +1,7 @@
 
 import firebase from '../src/'
 import { populate } from './util'
-import { expect } from 'chai'
+import { expect, assert } from 'chai'
 
 
 describe('document', () =>
@@ -28,7 +28,7 @@ describe('document', () =>
     expect(collection).to.deep.equal(['admin'])
   })
 
-  it ('chains sync', () =>
+  it ('chains sync', (done) =>
   {
     const APP = 'document chains sync'
     let app = firebase.initializeApp({}, APP)
@@ -37,21 +37,17 @@ describe('document', () =>
     db.doc('role/admin').set({name: 'Chains', admin: '3'})
     db.doc('admin/3').set({name: 'Thomas'})
 
-    let chained = 0
-
     db.collection('role')
       .doc('admin').get()
       .then(role => {
-        chained++
         expect(role.get('name')).to.equal('Chains')
         return db.collection('admin').doc(role.get('admin')).get()
       })
       .then(admin => {
-        chained++
         expect(admin.get('name')).to.equal('Thomas')
+        done()
       })
-
-    expect(chained).to.equal(2)
+      .catch(err => assert.fail(err))
   })
 
   it ('merges', () =>
@@ -85,13 +81,11 @@ describe('document', () =>
     expect(doc).to.deep.equal({name: 'Administrator', priority: 5, favorite: [4, 6, 2]})
   })
 
-  it('get', () =>
+  it('get', (done) =>
   {
     const APP = 'document get'
     let app = firebase.initializeApp({}, APP)
     let db = firebase.firestore(app)
-    let gets = 0
-    let errors = 0
 
     populate(db, {
       'cars/ford': {model: 'taurus', color: 'silver', miles: 123456}
@@ -102,19 +96,14 @@ describe('document', () =>
         expect(snap.exists).to.be.true
         expect(snap.data()).to.deep.equal({model: 'taurus', color: 'silver', miles: 123456})
         expect(snap.get('color')).to.equal('silver')
-        gets++
-      })
-      .catch(err => errors++)
 
-    db.collection('cars').doc('honda').get()
+        return db.collection('cars').doc('honda').get()
+      })
       .then(snap => {
         expect(snap.exists).to.be.false
-        gets++
+        done()
       })
-      .catch(err => errors++)
-
-    expect(errors).to.equal(0)
-    expect(gets).to.equal(2)
+      .catch(err => assert.fail(err))
   })
 
   it('realtime', () =>

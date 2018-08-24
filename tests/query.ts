@@ -1,13 +1,13 @@
 
 import firebase from '../src/'
 import { populate, pluck } from './util'
-import { expect } from 'chai'
+import { expect, assert } from 'chai'
 
 
 describe('query', () =>
 {
 
-  it('get simple', () =>
+  it('get simple', (done) =>
   {
     const APP = 'query get simple'
     let app = firebase.initializeApp({}, APP)
@@ -32,15 +32,12 @@ describe('query', () =>
         expect(querySnap.docs.length).to.equal(3)
         expect(querySnap.size).to.equal(3)
         expect(pluck(querySnap, 'name')).to.deep.equal(['2', '5', '4'])
-        gets++
+        done()
       })
-      .catch(err => errors++)
-
-    expect(gets).to.equal(1)
-    expect(errors).to.equal(0)
+      .catch(err => assert.fail(err))
   })
 
-  it('get order', () =>
+  it('get order', (done) =>
   {
     const APP = 'query get order'
     let app = firebase.initializeApp({}, APP)
@@ -66,12 +63,9 @@ describe('query', () =>
         expect(querySnap.docs.length).to.equal(3)
         expect(querySnap.size).to.equal(3)
         expect(pluck(querySnap, 'name')).to.deep.equal(['6', '3', '1'])
-        gets++
+        done()
       })
-      .catch(err => errors++)
-
-    expect(gets).to.equal(1)
-    expect(errors).to.equal(0)
+      .catch(err => assert.fail(err))
   })
 
   it('realtime', () =>
