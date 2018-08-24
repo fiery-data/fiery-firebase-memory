@@ -761,7 +761,7 @@ export namespace firebase
 
           if (newIndex === -1)
           {
-            changes.push({ doc, newIndex, oldIndex, type: 'removed' })
+            changes.push({ doc: doc.ref.snapshot(), newIndex, oldIndex, type: 'removed' })
           }
         }
 
