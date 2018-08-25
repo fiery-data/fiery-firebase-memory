@@ -2,6 +2,12 @@
   <img src="https://avatars1.githubusercontent.com/u/42543587?s=200&v=4" alt="Fiery Firebase Memory">  
 </p>
 
+<p align="center">
+<img src="https://img.shields.io/npm/v/fiery-firebase-memory.svg">
+<img src="https://img.shields.io/npm/l/fiery-firebase-memory.svg">
+<img src="https://travis-ci.org/fiery-data/fiery-firebase-memory.svg?branch=master">
+</p>
+
 This is a clone of Firebase Realtime Database & Firestore in TypeScript/JS which stores the data in memory.
 
 **!!! At the moment, only the Firestore code is "fully" developed !!!**
