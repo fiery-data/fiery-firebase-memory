@@ -588,6 +588,11 @@ export namespace firebase
           return []
         }
 
+        if (end !== snapshots.length && this._limit)
+        {
+          start = snapshots.length - this._limit
+        }
+
         if (start > 0)
         {
           snapshots.splice(0, start)
