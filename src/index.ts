@@ -518,8 +518,9 @@ export namespace firebase
           }
         }
 
+        const max: number = snapshots.length - 1
         let start: number = 0
-        let end: number = snapshots.length
+        let end: number = max // inclusive
 
         const orderBy: OrderBy[] = this._orderBy
 
@@ -583,14 +584,15 @@ export namespace firebase
           }
         }
 
-        if (start >= end)
+        if (start > end)
         {
           return []
         }
 
-        if (end !== snapshots.length && this._limit)
+        // If the end has moved, move the start to match the limit
+        if (end !== max && this._limit)
         {
-          start = snapshots.length - this._limit
+          start = end - this._limit - 1
         }
 
         if (start > 0)
@@ -598,7 +600,7 @@ export namespace firebase
           snapshots.splice(0, start)
         }
 
-        const limit: number = Math.min(end - start, this._limit)
+        const limit: number = Math.min(end - start + 1, this._limit)
 
         if (limit !== snapshots.length)
         {
