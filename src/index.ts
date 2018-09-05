@@ -519,7 +519,7 @@ export namespace firebase
         }
 
         let start: number = 0
-        let end: number = Math.min(this._limit, snapshots.length)
+        let end: number = snapshots.length
 
         const orderBy: OrderBy[] = this._orderBy
 
@@ -593,7 +593,7 @@ export namespace firebase
           snapshots.splice(0, start)
         }
 
-        const limit: number = end - start
+        const limit: number = Math.min(end - start, this._limit)
 
         if (limit !== snapshots.length)
         {
