@@ -135,4 +135,72 @@ describe('query', () =>
     expect(errors).to.equal(0)
   })
 
+  it('changes properly', () => {
+
+    const handleChanges = <E>(target: E[], changes: firebase.firestore.DocumentChange[]) => {
+      for (const change of changes) {
+        if (change.type !== 'added') {
+          target.splice(change.oldIndex, 1)
+        }
+        if (change.type !== 'removed') {
+          target.splice(change.newIndex, 0, change.doc.data() as E)
+        }
+      }
+      return target
+    }
+
+    const APP = 'changes properly'
+    let app = firebase.initializeApp({}, APP)
+    let db = firebase.firestore(app)
+
+    populate(db, {
+      'todo/1': { name: '1', done: true, assigned: ['a'], age: 12 },
+      'todo/7': { name: '7', done: true, assigned: ['b'], age: 11 },
+      'todo/2': { name: '2', done: false, assigned: [], age: 10 },
+      'todo/3': { name: '3', done: true, assigned: ['a', 'b'], age: 11 },
+      'todo/5': { name: '5', done: false, assigned: ['c'], age: 8 },
+      'todo/6': { name: '6', done: true, assigned: ['a'], age: 1 },
+      'todo/4': { name: '4', done: false, assigned: ['d'], age: 20 }
+    })
+
+    const todos: any[] = []
+
+    let off = db.collection('todo')
+      .where('assigned', 'array_contains', 'a')
+      .orderBy('age')
+      .onSnapshot(
+        querySnap => {
+          handleChanges(todos, querySnap.docChanges())
+        }
+      )
+
+    expect(todos.map(t => t.name)).to.deep.equal(['6', '3', '1'])
+
+    db.doc('todo/5').update({
+      assigned: firebase.firestore.FieldValue.arrayUnion('a')
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['6', '5', '3', '1'])
+
+    db.doc('todo/4').delete()
+
+    expect(todos.map(t => t.name)).to.deep.equal(['6', '5', '3', '1'])
+
+    db.doc('todo/6').delete()
+
+    expect(todos.map(t => t.name)).to.deep.equal(['5', '3', '1'])
+
+    db.doc('todo/1').update({
+      age: 7
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['1', '5', '3'])
+
+    db.doc('todo/8').set({ name: '8', done: false, assigned: ['a', 'd'], age: 7.5 })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['1', '8', '5', '3'])
+
+    off()
+  })
+
 })

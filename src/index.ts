@@ -102,35 +102,35 @@ export namespace firebase
   export namespace firestore
   {
 
-    type Off = () => any
+    export type Off = () => any
 
-    type ListenerMap = { [path: string]: Function[] }
+    export type ListenerMap = { [path: string]: Function[] }
 
-    type DocsMap = { [path: string]: any }
+    export type DocsMap = { [path: string]: any }
 
-    type CollectionsMap = { [path: string]: string[] }
+    export type CollectionsMap = { [path: string]: string[] }
 
-    type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => void
+    export type QuerySnapshotObserver = (querySnapshot: QuerySnapshot) => void
 
-    type QuerySnapshotError = (error: any) => any
+    export type QuerySnapshotError = (error: any) => any
 
     export type QueryDocumentSnapshot = DocumentSnapshot
 
-    type SnapshotObserver = (snapshot: DocumentSnapshot) => void
+    export type SnapshotObserver = (snapshot: DocumentSnapshot) => void
 
-    type SnapshotError = (error: any) => any
+    export type SnapshotError = (error: any) => any
 
-    type DocumentChangeType = 'added' | 'modified' | 'removed'
+    export type DocumentChangeType = 'added' | 'modified' | 'removed'
 
-    type WhereFilterOp = '<' | '<=' | '==' | '>=' | '>' | 'array-contains' | 'array_contains'
+    export type WhereFilterOp = '<' | '<=' | '==' | '>=' | '>' | 'array-contains' | 'array_contains'
 
-    type OrderByDirection = 'desc' | 'asc'
+    export type OrderByDirection = 'desc' | 'asc'
 
-    type DocumentData = { [field: string]: any }
+    export type DocumentData = { [field: string]: any }
 
-    type UpdateData = { [fieldPath: string]: any }
+    export type UpdateData = { [fieldPath: string]: any }
 
-    type LogLevel = 'debug' | 'error' | 'silent'
+    export type LogLevel = 'debug' | 'error' | 'silent'
 
     const defaultMetadata: SnapshotMetadata =
     {
@@ -230,25 +230,55 @@ export namespace firebase
 
       INTERNAL: { delete: () => Promise<void> }
 
+
+      onDocumentGet (path: string, doc: any) {}
+
+      onDocumentCreate (path: string, emptyDoc: any) {}
+
+      onDocumentUpdate (path: string, values: UpdateData | DocumentData, doc: any) {}
+
+      onDocumentRemove (path: string, id: string, doc: any) {}
+
+      onCollectionCreate (path: string, docs: any[]) {}
+
+      onCollectionUpdate (path: string, docs: string[], id: string, doc: any) {}
+
+      onCollectionRemove (path: string) {}
+
+      onListenerAdd (path: string) {}
+
+      onListenerRemove (path: string) {}
+
+      onListenerNotify (path: string) {}
+
+
       dataAt (path: string, create: boolean = false)
       {
         if (!(path in this._docs) && create)
         {
           this._docs[path] = obj()
 
+          this.onDocumentCreate( path, this._docs[path] )
+
           const { id, parentPath } = parsePath(path)
           let collection: string[] = this._collections[parentPath]
 
           if (!collection)
           {
-            collection = this._collections[parentPath] =  []
+            collection = this._collections[parentPath] = []
+
+            this.onCollectionCreate( parentPath, collection )
           }
 
           if (collection.indexOf(id) === -1)
           {
             collection.push(id)
+
+            this.onCollectionUpdate( parentPath, collection, id, this._docs[path] )
           }
         }
+
+        this.onDocumentGet( path, this._docs[path] )
 
         return this._docs[path]
       }
@@ -257,6 +287,13 @@ export namespace firebase
       {
         const { id, parentPath } = parsePath(path)
         const collection: string[] = this._collections[parentPath]
+
+        if (!(path in this._docs))
+        {
+          return
+        }
+
+        this.onDocumentRemove( path, id, this._docs[path] )
 
         delete this._docs[path]
 
@@ -271,24 +308,16 @@ export namespace firebase
             if (collection.length === 0)
             {
               delete this._collections[parentPath]
+
+              this.onCollectionRemove( parentPath )
             }
           }
         }
       }
 
-      documentsAt (path: string, create: boolean = false)
+      documentsAt (path: string)
       {
-        if (!(path in this._collections) && create)
-        {
-          this._collections[path] = []
-        }
-
         return this._collections[path]
-      }
-
-      documentsAtRemove (path: string)
-      {
-        delete this._collections[path]
       }
 
       listenersAt (path: string)
@@ -302,6 +331,8 @@ export namespace firebase
       listenersAtAdd (path: string, listener: any)
       {
         this.listenersAt(path).push(listener)
+
+        this.onListenerAdd( path )
       }
 
       listenersAtRemove (path: string, listener: any)
@@ -315,10 +346,14 @@ export namespace firebase
         if (listeners.length === 0) {
           delete this._listeners[path]
         }
+
+        this.onListenerRemove( path )
       }
 
       notifyAt (path: string)
       {
+        this.onListenerNotify( path )
+
         this.listenersAt(path).forEach(listener => listener())
       }
     }
@@ -743,32 +778,45 @@ export namespace firebase
       public docChanges (): DocumentChange[]
       {
         const changes: DocumentChange[] = []
+        const prev: QueryDocumentSnapshot[] = this._prev.slice()
+        const next: QueryDocumentSnapshot[] = this._next.slice()
 
-        for (let i = 0; i < this._next.length; i++)
+        for (let i = 0; i < prev.length; i++)
         {
-          const doc: QueryDocumentSnapshot = this._next[i]
-          const newIndex: number = i
-          const oldIndex: number = this._prev.findIndex(prev => prev.id === doc.id)
-
-          if (oldIndex === -1)
-          {
-            changes.push({ doc, newIndex, oldIndex, type: 'added' })
-          }
-          else if (oldIndex !== newIndex || !doc.isEqual(this._prev[oldIndex]))
-          {
-            changes.push({ doc, newIndex, oldIndex, type: 'modified' })
-          }
-        }
-
-        for (let i = 0; i < this._prev.length; i++)
-        {
-          const doc: QueryDocumentSnapshot = this._prev[i]
-          const newIndex: number = this._next.findIndex(next => next.id === doc.id)
+          const doc: QueryDocumentSnapshot = prev[i]
+          const newIndex: number = next.findIndex(n => n.id === doc.id)
           const oldIndex: number = i
 
           if (newIndex === -1)
           {
+            prev.splice(oldIndex, 1)
+            
             changes.push({ doc: doc.ref.snapshot(), newIndex, oldIndex, type: 'removed' })
+            i--
+          }
+        }
+
+        for (let i = 0; i < next.length; i++)
+        {
+          const doc: QueryDocumentSnapshot = next[i]
+          const newIndex: number = i
+          const oldIndex: number = prev.findIndex(p => p.id === doc.id)
+
+          if (oldIndex === -1)
+          {
+            prev.splice(newIndex, 0, doc)
+
+            changes.push({ doc, newIndex, oldIndex, type: 'added' })
+          }
+          else if (oldIndex !== newIndex || !doc.isEqual(prev[oldIndex]))
+          {
+            if (oldIndex !== newIndex)
+            {
+              prev.splice(oldIndex, 1)
+              prev.splice(newIndex, 0, doc)
+            }
+
+            changes.push({ doc, newIndex, oldIndex, type: 'modified' })
           }
         }
 
@@ -978,6 +1026,8 @@ export namespace firebase
             access.set(next)
           }
         }
+
+        this.firestore.onDocumentUpdate( this.path, values, data )
       }
 
       notify (): void

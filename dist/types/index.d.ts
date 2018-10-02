@@ -64,10 +64,19 @@ export declare namespace firebase {
             INTERNAL: {
                 delete: () => Promise<void>;
             };
+            onDocumentGet(path: string, doc: any): void;
+            onDocumentCreate(path: string, emptyDoc: any): void;
+            onDocumentUpdate(path: string, values: UpdateData | DocumentData, doc: any): void;
+            onDocumentRemove(path: string, id: string, doc: any): void;
+            onCollectionCreate(path: string, docs: any[]): void;
+            onCollectionUpdate(path: string, docs: string[], id: string, doc: any): void;
+            onCollectionRemove(path: string): void;
+            onListenerAdd(path: string): void;
+            onListenerRemove(path: string): void;
+            onListenerNotify(path: string): void;
             dataAt(path: string, create?: boolean): any;
             dataAtRemove(path: string): void;
-            documentsAt(path: string, create?: boolean): string[];
-            documentsAtRemove(path: string): void;
+            documentsAt(path: string): string[];
             listenersAt(path: string): Function[];
             listenersAtAdd(path: string, listener: any): void;
             listenersAtRemove(path: string, listener: any): void;
