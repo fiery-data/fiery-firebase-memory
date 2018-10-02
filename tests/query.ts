@@ -200,6 +200,18 @@ describe('query', () =>
 
     expect(todos.map(t => t.name)).to.deep.equal(['1', '8', '5', '3'])
 
+    db.doc('todo/8').update({
+      age: 8.5
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['1', '5', '8', '3'])
+
+    db.doc('todo/1').update({
+      age: 20
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['5', '8', '3', '1'])
+
     off()
   })
 
