@@ -212,7 +212,80 @@ describe('query', () =>
 
     expect(todos.map(t => t.name)).to.deep.equal(['5', '8', '3', '1'])
 
+    db.doc('todo/5').delete()
+
+    expect(todos.map(t => t.name)).to.deep.equal(['8', '3', '1'])
+
     off()
+  })
+
+  it('tests fiery-vuex', () =>
+  {
+    const handleChanges = <E>(target: E[], changes: firebase.firestore.DocumentChange[]) => {
+      for (const change of changes) {
+        if (change.type !== 'added') {
+          target.splice(change.oldIndex, 1)
+        }
+        if (change.type !== 'removed') {
+          target.splice(change.newIndex, 0, change.doc.data() as E)
+        }
+      }
+      return target
+    }
+
+    const APP = 'tests fiery-vuex'
+    let app = firebase.initializeApp({}, APP)
+    let db = firebase.firestore(app)
+
+    populate(db, {
+      'todos/1': { name: 'T1', done: false },
+      'todos/2': { name: 'T2', done: true },
+      'todos/3': { name: 'T3', done: false },
+      'todos/4': { name: 'T4', done: true },
+      'todos/5': { name: 'T5', done: true }
+    })
+
+    const todos: any[] = []
+
+    let off1 = db.collection('todos')
+      .orderBy('name')
+      .where('done', '==', true)
+      .onSnapshot(
+        querySnap => {
+          handleChanges(todos, querySnap.docChanges())
+        }
+      )
+
+    expect(todos.map(t => t.name)).to.deep.equal(['T2', 'T4', 'T5'])
+
+    db.doc('todos/2').update({
+      done: false
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['T4', 'T5'])
+
+    db.doc('todos/3').update({
+      done: true
+    })
+
+    expect(todos.map(t => t.name)).to.deep.equal(['T3', 'T4', 'T5'])
+
+    off1()
+
+    todos.length = 0
+
+    let off2 = db.collection('todos')
+      .orderBy('name')
+      .where('done', '==', false)
+      .onSnapshot(
+        querySnap => {
+          handleChanges(todos, querySnap.docChanges())
+        }
+      )
+
+    expect(todos.map(t => t.name)).to.deep.equal(['T1', 'T2'])
+
+    off2()
   })
 
 })
