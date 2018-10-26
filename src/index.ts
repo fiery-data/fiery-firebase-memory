@@ -625,7 +625,7 @@ export namespace firebase
         }
 
         // If the end has moved, move the start to match the limit
-        if (end !== max && this._limit)
+        if (end !== max && this._limit !== Number.MAX_VALUE)
         {
           start = end - this._limit - 1
         }
@@ -790,7 +790,7 @@ export namespace firebase
           if (newIndex === -1)
           {
             prev.splice(oldIndex, 1)
-            
+
             changes.push({ doc: doc.ref.snapshot(), newIndex, oldIndex, type: 'removed' })
             i--
           }
