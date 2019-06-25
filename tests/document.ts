@@ -2,6 +2,7 @@
 import firebase from '../src/'
 import { populate } from './util'
 import { expect, assert } from 'chai'
+import { describe, it } from 'mocha'
 
 
 describe('document', () =>

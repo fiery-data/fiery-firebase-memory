@@ -29,3 +29,21 @@ export function pluck<T>(querySnapshot: firebase.firestore.QuerySnapshot, fieldP
 
   return plucked
 }
+
+export function handleChanges<E>(target: E[], changes: firebase.firestore.DocumentChange[]): E[]
+{
+  for (const change of changes) 
+  {
+    if (change.type !== 'added') 
+    {
+      target.splice(change.oldIndex, 1)
+    }
+
+    if (change.type !== 'removed') 
+    {
+      target.splice(change.newIndex, 0, change.doc.data() as E)
+    }
+  }
+  
+  return target
+}

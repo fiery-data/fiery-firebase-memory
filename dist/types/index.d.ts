@@ -45,6 +45,7 @@ export declare namespace firebase {
             [fieldPath: string]: any;
         };
         type LogLevel = 'debug' | 'error' | 'silent';
+        function setLogLevel(logLevel: LogLevel): void;
         class Firestore {
             readonly app: firebase.app.App;
             _docs: DocsMap;
@@ -54,11 +55,11 @@ export declare namespace firebase {
             constructor(app: firebase.app.App);
             batch(): WriteBatch;
             collection(collectionPath: string): CollectionReference;
+            collectionGroup(collectionId: string): Query;
             doc(documentPath: string): DocumentReference;
             disableNetwork(): Promise<void>;
             enableNetwork(): Promise<void>;
-            enablePersistence(): Promise<void>;
-            setLogLevel(logLevel: LogLevel): void;
+            enablePersistence(settings?: PersistenceSettings): Promise<void>;
             runTransaction<T>(updateFunction: (transaction: Transaction) => Promise<T>): Promise<T>;
             settings(settings: Settings): void;
             INTERNAL: {
@@ -77,10 +78,15 @@ export declare namespace firebase {
             dataAt(path: string, create?: boolean): any;
             dataAtRemove(path: string): void;
             documentsAt(path: string): string[];
+            documentsInGroup(collectionId: string, onGroup: (collectionPath: string, documents: string[]) => any): void;
             listenersAt(path: string): Function[];
             listenersAtAdd(path: string, listener: any): void;
             listenersAtRemove(path: string, listener: any): void;
             notifyAt(path: string): void;
+        }
+        interface PersistenceSettings {
+            experimentalTabSynchronization?: boolean;
+            synchronizeTabs?: boolean;
         }
         class Query {
             readonly firestore: Firestore;
@@ -92,7 +98,8 @@ export declare namespace firebase {
             _endBefore: any[];
             _where: Where[];
             _limit: number;
-            constructor(firestore: Firestore, path: string);
+            _groupId?: string;
+            constructor(firestore: Firestore, path: string, groupId?: string);
             endAt(snapshot: DocumentSnapshot): Query;
             endBefore(snapshot: DocumentSnapshot): Query;
             startAfter(snapshot: DocumentSnapshot): Query;
@@ -114,6 +121,7 @@ export declare namespace firebase {
             static arrayUnion(...values: any[]): FieldValue;
             static delete(): FieldValue;
             static serverTimestamp(): FieldValue;
+            static increment(n: number): FieldValue;
         }
         class DocumentSnapshot {
             readonly exists: boolean;
@@ -191,15 +199,18 @@ export declare namespace firebase {
             static now(): Timestamp;
         }
         class Transaction {
+            readonly _calls: Array<() => any>;
             get(documentRef: DocumentReference): Promise<DocumentSnapshot>;
             set(documentRef: DocumentReference, data: DocumentData, options?: SetOptions): Transaction;
             update(documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction;
             delete(documentRef: DocumentReference): Transaction;
+            commit(): void;
         }
         class WriteBatch {
+            readonly _calls: Array<() => any>;
             set(documentRef: DocumentReference, data: DocumentData, options?: SetOptions): WriteBatch;
-            update(documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction;
-            delete(documentRef: DocumentReference): Transaction;
+            update(documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): WriteBatch;
+            delete(documentRef: DocumentReference): WriteBatch;
             commit(): Promise<void>;
         }
         interface QueryListenOptions {
@@ -215,12 +226,15 @@ export declare namespace firebase {
             host?: string;
             ssl?: boolean;
             timestampsInSnapshots?: boolean;
+            cacheSizeBytes?: number;
+            experimentalForceLongPolling?: boolean;
         }
         interface GetOptions {
-            readonly source?: 'default' | 'server' | 'client';
+            readonly source?: 'default' | 'server' | 'cache';
         }
         interface SetOptions {
             readonly merge?: boolean;
+            readonly mergeFields?: (string | FieldPath)[];
         }
         interface SnapshotOptions {
             readonly serverTimestamps?: 'estimate' | 'previous' | 'none';

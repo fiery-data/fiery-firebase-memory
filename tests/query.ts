@@ -1,7 +1,8 @@
 
 import firebase from '../src/'
-import { populate, pluck } from './util'
+import { populate, pluck, handleChanges } from './util'
 import { expect, assert } from 'chai'
+import { describe, it } from 'mocha'
 
 
 describe('query', () =>
@@ -137,18 +138,6 @@ describe('query', () =>
 
   it('changes properly', () => {
 
-    const handleChanges = <E>(target: E[], changes: firebase.firestore.DocumentChange[]) => {
-      for (const change of changes) {
-        if (change.type !== 'added') {
-          target.splice(change.oldIndex, 1)
-        }
-        if (change.type !== 'removed') {
-          target.splice(change.newIndex, 0, change.doc.data() as E)
-        }
-      }
-      return target
-    }
-
     const APP = 'changes properly'
     let app = firebase.initializeApp({}, APP)
     let db = firebase.firestore(app)
@@ -219,20 +208,32 @@ describe('query', () =>
     off()
   })
 
+  it('collectionGroup', async () => 
+  {
+    const APP = 'collectionGroup'
+    let app = firebase.initializeApp({}, APP)
+    let db = firebase.firestore(app)
+
+    populate(db, {
+      'todo/1': { name: '1', done: true, age: 12 },
+      'todo/7': { name: '7', done: true, age: 11 },
+      'todo/1/assigned/a': { id: 'a', name: 'Thomas' },
+      'todo/7/assigned/b': { id: 'b', name: 'John' },
+      'assigned/c': { id: 'c', name: 'Patrick' },
+    })
+
+    const snap = await db.collectionGroup('assigned').get()
+    const assigned = handleChanges([], snap.docChanges())
+
+    expect(assigned).to.deep.equal([
+      { id: 'a', name: 'Thomas' },
+      { id: 'b', name: 'John' },
+      { id: 'c', name: 'Patrick' },
+    ])
+  })
+
   it('tests fiery-vuex', () =>
   {
-    const handleChanges = <E>(target: E[], changes: firebase.firestore.DocumentChange[]) => {
-      for (const change of changes) {
-        if (change.type !== 'added') {
-          target.splice(change.oldIndex, 1)
-        }
-        if (change.type !== 'removed') {
-          target.splice(change.newIndex, 0, change.doc.data() as E)
-        }
-      }
-      return target
-    }
-
     const APP = 'tests fiery-vuex'
     let app = firebase.initializeApp({}, APP)
     let db = firebase.firestore(app)

@@ -132,6 +132,11 @@ export namespace firebase
 
     export type LogLevel = 'debug' | 'error' | 'silent'
 
+    export function setLogLevel(logLevel: LogLevel): void
+    {
+
+    }
+
     const defaultMetadata: SnapshotMetadata =
     {
       fromCache:  false,
@@ -162,20 +167,18 @@ export namespace firebase
 
         this.INTERNAL =
         {
-          delete: () =>
+          delete: async () =>
           {
             this._docs = obj()
             this._collections = obj()
             this._listeners = obj()
-
-            return Promise.resolve()
           }
         }
       }
 
       public batch (): WriteBatch
       {
-        throw 'firebase.firestore.Firestore.batch is not supported'
+        return new WriteBatch()
       }
 
       public collection (collectionPath: string): CollectionReference
@@ -183,44 +186,46 @@ export namespace firebase
         return new CollectionReference(this, collectionPath)
       }
 
+      public collectionGroup (collectionId: string): Query
+      {
+        return new Query(this, '', collectionId)
+      }
+
       public doc (documentPath: string): DocumentReference
       {
         return new DocumentReference(this, documentPath)
       }
 
-      public disableNetwork (): Promise<void>
+      public async disableNetwork (): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.disableNetwork is not supported'
       }
 
-      public enableNetwork (): Promise<void>
+      public async enableNetwork (): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.enableNetwork is not supported'
       }
 
-      public enablePersistence (): Promise<void>
+      public async enablePersistence (settings?: PersistenceSettings): Promise<void>
       {
         // TODO
 
         throw 'firebase.firestore.Firestore.enablePersistence is not supported'
       }
 
-      public setLogLevel (logLevel: LogLevel): void
-      {
-        // TODO
-
-        throw 'firebase.firestore.Firestore.setLogLevel is not supported'
-      }
-
       public runTransaction<T> (updateFunction: (transaction: Transaction) => Promise<T>): Promise<T>
       {
         const trans = new Transaction()
 
-        return updateFunction(trans)
+        const result = updateFunction(trans)
+
+        trans.commit()
+
+        return result
       }
 
       public settings (settings: Settings): void
@@ -320,11 +325,26 @@ export namespace firebase
         return this._collections[path]
       }
 
+      documentsInGroup (collectionId: string, onGroup: (collectionPath: string, documents: string[]) => any)
+      {
+        for (const collectionPath in this._collections)
+        {
+          const { id } = parsePath(collectionPath)
+
+          if (id === collectionId)
+          {
+            onGroup( collectionPath, this._collections[collectionPath] )
+          }
+        }
+      }
+
       listenersAt (path: string)
       {
-        if (!(path in this._listeners)) {
+        if (!(path in this._listeners)) 
+        {
           this._listeners[path] = []
         }
+
         return this._listeners[path]
       }
 
@@ -340,10 +360,13 @@ export namespace firebase
         const listeners = this.listenersAt(path)
         const index = listeners.indexOf(listener)
 
-        if (index !== -1) {
+        if (index !== -1) 
+        {
           listeners.splice(index, 1)
         }
-        if (listeners.length === 0) {
+
+        if (listeners.length === 0) 
+        {
           delete this._listeners[path]
         }
 
@@ -358,6 +381,12 @@ export namespace firebase
       }
     }
 
+    export interface PersistenceSettings
+    {
+      experimentalTabSynchronization?: boolean
+      synchronizeTabs?: boolean
+    }
+
     export class Query
     {
       public readonly firestore: Firestore
@@ -370,11 +399,13 @@ export namespace firebase
       _endBefore: any[] = []
       _where: Where[] = []
       _limit: number = Number.MAX_VALUE
+      _groupId?: string;
 
-      public constructor (firestore: Firestore, path: string)
+      public constructor (firestore: Firestore, path: string, groupId?: string)
       {
         this.firestore = firestore
         this._path = path
+        this._groupId = groupId;
       }
 
       public endAt (snapshot: DocumentSnapshot): Query
@@ -440,9 +471,9 @@ export namespace firebase
         return this.extend(q => q._where.push(new Where(fieldPath, operationStr, value)))
       }
 
-      public get (options?: GetOptions): Promise<QuerySnapshot>
+      public async get (options?: GetOptions): Promise<QuerySnapshot>
       {
-        return Promise.resolve(new QuerySnapshot(this, [], this.getResults()))
+        return new QuerySnapshot(this, [], this.getResults())
       }
 
       public isEqual (other: Query): boolean
@@ -498,7 +529,7 @@ export namespace firebase
 
       extend (modify?: (copy: Query) => any): Query
       {
-        const e = new Query(this.firestore, this._path)
+        const e = new Query(this.firestore, this._path, this._groupId)
 
         e._where = this._where.slice()
         e._orderBy = this._orderBy.slice()
@@ -515,42 +546,54 @@ export namespace firebase
 
       getResults (): QueryDocumentSnapshot[]
       {
-        const parentPath = this._path + PATH_SEPARATOR
         const snapshots: QueryDocumentSnapshot[] = []
-        const documents = this.firestore.documentsAt(this._path)
 
-        if (!documents)
+        const handleDocuments = (parentPath: string, documents: string[]) => 
         {
-          return snapshots
-        }
+          const pathPrefix = parentPath + PATH_SEPARATOR
 
-        for (let id of documents)
-        {
-          const ref: DocumentReference = this.firestore.doc(parentPath + id)
-          const doc: QueryDocumentSnapshot = ref.snapshot()
-          const where: Where[] = this._where
-
-          if (where.length === 0)
+          for (let id of documents)
           {
-            snapshots.push(doc)
-          }
-          else
-          {
-            let match: boolean = true
+            const ref: DocumentReference = this.firestore.doc(pathPrefix + id)
+            const doc: QueryDocumentSnapshot = ref.snapshot()
+            const where: Where[] = this._where
 
-            for (var i = 0; match && i < where.length; i++)
-            {
-              if (!where[i].matches(doc))
-              {
-                match = false
-              }
-            }
-
-            if (match)
+            if (where.length === 0)
             {
               snapshots.push(doc)
             }
+            else
+            {
+              let match: boolean = true
+
+              for (var i = 0; match && i < where.length; i++)
+              {
+                if (!where[i].matches(doc))
+                {
+                  match = false
+                }
+              }
+
+              if (match)
+              {
+                snapshots.push(doc)
+              }
+            }
           }
+        };
+
+        if (this._groupId)
+        {
+          this.firestore.documentsInGroup(this._groupId, handleDocuments)
+        }
+        else if (this.firestore.documentsAt(this._path))
+        {
+          handleDocuments(this._path, this.firestore.documentsAt(this._path))
+        }
+
+        if (snapshots.length === 0)
+        {
+          return snapshots
         }
 
         const max: number = snapshots.length - 1
@@ -718,6 +761,11 @@ export namespace firebase
       public static serverTimestamp (): FieldValue
       {
         return new FieldValue(existing => new Date())
+      }
+
+      public static increment (n: number): FieldValue
+      {
+        return new FieldValue(existing => existing + n);
       }
     }
 
@@ -929,7 +977,7 @@ export namespace firebase
         return this.path === other.path
       }
 
-      public set (data: DocumentData, options?: SetOptions): Promise<void>
+      public async set (data: DocumentData, options?: SetOptions): Promise<void>
       {
         if (!options || !options.merge)
         {
@@ -938,33 +986,27 @@ export namespace firebase
 
         this.applyValues(data)
         this.notify()
-
-        return Promise.resolve()
       }
 
-      public delete (): Promise<void>
+      public async delete (): Promise<void>
       {
         if (this.firestore.dataAt(this.path))
         {
           this.clearValues()
           this.notify()
         }
-
-        return Promise.resolve()
       }
 
-      public update (field: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Promise<void>
-      public update (data: UpdateData): Promise<void>
+      public async update (field: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Promise<void>
+      public async update (data: UpdateData): Promise<void>
       {
         this.applyValues(data)
         this.notify()
-
-        return Promise.resolve()
       }
 
-      public get (options?: GetOptions): Promise<DocumentSnapshot>
+      public async get (options?: GetOptions): Promise<DocumentSnapshot>
       {
-        return Promise.resolve(this.snapshot())
+        return this.snapshot()
       }
 
       public onSnapshot (
@@ -1125,47 +1167,68 @@ export namespace firebase
 
     export class Transaction
     {
+      readonly _calls: Array<() => any> = []; 
+
       public get (documentRef: DocumentReference): Promise<DocumentSnapshot>
       {
-        throw 'firebase.firestore.Transaction.get not supported'
+        return documentRef.get()
       }
 
       public set (documentRef: DocumentReference, data: DocumentData, options?: SetOptions): Transaction
       {
-        throw 'firebase.firestore.Transaction.set not supported'
+        this._calls.push(() => documentRef.set(data, options))
+
+        return this
       }
 
       public update (documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction
       {
-        throw 'firebase.firestore.Transaction.update not supported'
+        this._calls.push(() => documentRef.update(fieldOrData, value, ...moreFieldsAndValues))
+
+        return this
       }
 
       public delete (documentRef: DocumentReference): Transaction
       {
-        throw 'firebase.firestore.Transaction.delete not supported'
+        this._calls.push(() => documentRef.delete())
+
+        return this
+      }
+
+      commit (): void
+      {
+        this._calls.forEach(c => c());
       }
     }
 
     export class WriteBatch
     {
+      readonly _calls: Array<() => any> = []; 
+
       public set (documentRef: DocumentReference, data: DocumentData, options?: SetOptions): WriteBatch
       {
-        throw 'firebase.firestore.WriteBatch.set not supported'
+        this._calls.push(() => documentRef.set(data, options))
+
+        return this
       }
 
-      public update (documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): Transaction
+      public update (documentRef: DocumentReference, fieldOrData: string | FieldPath | UpdateData, value?: any, ...moreFieldsAndValues: any[]): WriteBatch
       {
-        throw 'firebase.firestore.WriteBatch.update not supported'
+        this._calls.push(() => documentRef.update(fieldOrData, value, ...moreFieldsAndValues))
+        
+        return this
       }
 
-      public delete (documentRef: DocumentReference): Transaction
+      public delete (documentRef: DocumentReference): WriteBatch
       {
-        throw 'firebase.firestore.WriteBatch.delete not supported'
+        this._calls.push(() => documentRef.delete())
+
+        return this
       }
 
-      public commit (): Promise<void>
+      public async commit (): Promise<void>
       {
-        throw 'firebase.firestore.WriteBatch.commit not supported'
+        this._calls.forEach(c => c());
       }
     }
 
@@ -1188,16 +1251,19 @@ export namespace firebase
       host?: string
       ssl?: boolean
       timestampsInSnapshots?: boolean
+      cacheSizeBytes?: number
+      experimentalForceLongPolling?: boolean
     }
 
     export interface GetOptions
     {
-      readonly source?: 'default' | 'server' | 'client'
+      readonly source?: 'default' | 'server' | 'cache'
     }
 
     export interface SetOptions
     {
       readonly merge?: boolean
+      readonly mergeFields?: (string | FieldPath)[]
     }
 
     export interface SnapshotOptions
